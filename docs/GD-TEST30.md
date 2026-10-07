@@ -224,14 +224,15 @@ size reported by ls: 70M
 The exact ELF must be kept with the installed package. Any `eboot+0x...` crash offset from this
 build must be symbolized against `eden-ps4-gd-test30-20261007-2012.elf`, not against a later build.
 
-SHA-256 values were not recorded at documentation time and should be captured before moving the
-artifacts to the console:
+SHA-256 values captured on 2026-10-07:
 
-```bash
-sha256sum \
-  out-eden/IV0000-EDPS00001_00-EDENPS4000000000.pkg \
-  elf/eden-ps4-gd-test30-20261007-2012.elf
+```text
+3437859813eca8aaeddfb2173f32c99e4d196a73f97c790ba49aff6b42bfc547  out-eden/IV0000-EDPS00001_00-EDENPS4000000000.pkg
+87ba17b441cbf49af6506f8439ad31458e1c985b9a990ec15865d38e205ea3f9  elf/eden-ps4-gd-test30-20261007-2012.elf
 ```
+
+These hashes identify the exact Test 30 package/ELF pair to use for the first hardware validation.
+The ELF must remain paired with this PKG for crash symbolization.
 
 ## Console test plan
 
