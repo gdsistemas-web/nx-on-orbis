@@ -26,7 +26,7 @@ fi
 
 [ -f "$DST/BUNDLE.txt" ] || { echo "SDK extraction did not create $DST" >&2; exit 3; }
 chmod +x "$DST"/env.sh "$DST"/verify.sh 2>/dev/null || true
-"$DST/verify.sh"
+"$DST/verify.sh" "$DST"
 
 echo
 echo "SDK ready: $DST"
