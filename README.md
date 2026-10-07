@@ -1,6 +1,6 @@
 # NX on Orbis
 
-> **This is the `experimental-fastmem` branch** (tests 25-29), not the release. Fastmem works, but races no longer load (direct memory runs out). For the build that reaches races use `main` / v0.1.0. Details in [docs/STATUS.md](docs/STATUS.md#the-experimental-branch-tests-25-29).
+> **This is the `dev/fastmem-v1` continuation branch.** It is based on `experimental-fastmem` (tests 25-29) and adds **GD Test 30** fastmem hotspot diagnostics plus a reproducible Linux build/package path. The Test 30 PKG builds successfully on Linux; console validation is still pending. See [docs/GD-TEST30.md](docs/GD-TEST30.md).
 
 An experimental port of the **Eden** Nintendo Switch emulator (a yuzu fork) to a jailbroken
 **PS4 Pro** (OpenOrbis toolchain, Mesa RADV Vulkan driver for the PS4 GPU).
@@ -71,7 +71,8 @@ time to keep testing.
 - [docs/STATUS.md](docs/STATUS.md): goals and expectations, results test by test, profiling,
   projected maximum performance, and where to continue.
 - [docs/INSTALL.md](docs/INSTALL.md): installing the release and laying out your own files.
-- [docs/BUILDING.md](docs/BUILDING.md): rebuilding everything from source (Windows + Git Bash).
+- [docs/BUILDING.md](docs/BUILDING.md): rebuilding from source, including the Linux continuation path.
+- [docs/GD-TEST30.md](docs/GD-TEST30.md): GD Test 30 Linux bring-up, fixes, generated artifacts and PS4 validation plan.
 - [docs/TECHNICAL.md](docs/TECHNICAL.md): platform findings (several are useful to any PS4
   homebrew port: the SDK's 16-bit `wmemchr`, the package layout that grants 4.4 GiB, the GPU
   driver's memory behaviour, fault handling, address-space limits).
@@ -84,6 +85,9 @@ time to keep testing.
   backing, JIT faults redirected to dynarmic's slow path), plus a direct-memory map in the log,
   the environment moved out of the heap after a heap-corruption crash, and a smaller GPU arena.
   It never got back into a race: loading one runs direct memory out. Notes in `docs/STATUS.md`.
+- `dev/fastmem-v1`: GD Test 30 continuation. Adds redirect hotspot diagnostics, Linux dependency
+  bootstrap, Linux Eden build support and Linux PKG packaging. Build/package are validated; console
+  test is pending.
 
 ## Credits
 
