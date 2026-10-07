@@ -2,6 +2,7 @@
 # Report what is ready/missing before configuring Eden on Linux.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+[ -x "$ROOT/tools/cmake/bin/cmake" ] && export PATH="$ROOT/tools/cmake/bin:$PATH"
 fail=0
 
 ok(){ printf '  [OK]   %s\n' "$1"; }
@@ -10,6 +11,15 @@ miss(){ printf '  [MISS] %s\n' "$1"; fail=1; }
 for t in cmake ninja clang clang++ llvm-ar llvm-ranlib llvm-nm ld.lld python3 make perl git; do
   command -v "$t" >/dev/null 2>&1 && ok "$t -> $(command -v "$t")" || miss "$t"
 done
+
+cmake_version="$(cmake --version 2>/dev/null | sed -n '1s/cmake version //p')"
+cmake_major="$(printf '%s' "$cmake_version" | cut -d. -f1)"
+cmake_minor="$(printf '%s' "$cmake_version" | cut -d. -f2)"
+if [ "${cmake_major:-0}" -gt 3 ] || { [ "${cmake_major:-0}" -eq 3 ] && [ "${cmake_minor:-0}" -ge 31 ]; }; then
+  ok "cmake version $cmake_version"
+else
+  miss "CMake >= 3.31 required (current: ${cmake_version:-unknown}; run scripts/bootstrap-cmake-linux.sh)"
+fi
 
 clang_major="$(clang --version 2>/dev/null | sed -n '1s/.*version \([0-9][0-9]*\).*/\1/p')"
 if [ "$clang_major" = "18" ]; then
