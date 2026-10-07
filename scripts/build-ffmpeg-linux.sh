@@ -9,6 +9,10 @@ COMMIT="c7b5f1537d9c52efa50fd10d106ca015ddde1818"
 
 source "$ROOT/tools/env-build.sh"
 
+# Files created/updated through the GitHub contents API may lose the executable bit.
+# FFmpeg requires its --cc/--ld wrapper to be directly executable.
+chmod +x "$ROOT/tools/ps4-cc.sh"
+
 if [ ! -d "$SRC/.git" ]; then
   rm -rf "$SRC"
   git clone --filter=blob:none https://github.com/FFmpeg/FFmpeg.git "$SRC"
