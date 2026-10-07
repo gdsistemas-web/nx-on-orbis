@@ -27,6 +27,16 @@ git -C "$SRC" sparse-checkout set \
   llvm/cmake \
   llvm/utils/llvm-lit
 
+PATCH="$ROOT/patches/llvm/0001-libcxx-orbis-fstream-copy-file.patch"
+if git -C "$SRC" apply --check "$PATCH" >/dev/null 2>&1; then
+  git -C "$SRC" apply "$PATCH"
+elif git -C "$SRC" apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+  echo "libc++ Orbis filesystem patch already applied"
+else
+  echo "cannot apply libc++ Orbis filesystem patch cleanly" >&2
+  exit 4
+fi
+
 rm -rf "$BUILD"
 
 cmake -S "$SRC/runtimes" -B "$BUILD" -G Ninja \
