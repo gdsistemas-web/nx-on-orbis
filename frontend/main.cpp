@@ -487,7 +487,7 @@ void CheckMutexes() {
 int main() {
     Ps4::OpenBootLog();
     Ps4::Log("eden-ps4 starting (Eden %s %s)", Common::g_scm_branch, Common::g_scm_desc);
-    Ps4::Log("PS4 build: %s; test 29: environment moved out of the heap + heap corruption detector (test 28 crashed in getenv), GPU arena 1152 MiB, fastmem redirects by cause, fastmem view <= 64 GiB, direct memory map, unsafe CPU, lazy memory at the top; defaults CPU ASTC, swizzle test off",
+    Ps4::Log("PS4 build: %s; GD test 30: fastmem redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
              EDEN_PS4_BUILD_ID);
     Ps4::InstallCrashReporting();
     Ps4::StartWatchdog();
@@ -673,6 +673,25 @@ int main() {
                          static_cast<unsigned long>(view.redirect_sample[3]),
                          static_cast<unsigned long>(view.redirect_reason[4]),
                          static_cast<unsigned long>(view.redirect_sample[4]));
+                // Every ~30 s, print only the hottest redirect pages. Counting itself is done in a
+                // fixed allocation-free table in the exception path; no per-fault logging.
+                if (status_count % 3 == 0) {
+                    Common::Orbis::RedirectHotspot hot[8]{};
+                    std::size_t tracked_pages = 0;
+                    std::size_t dropped = 0;
+                    const std::size_t hot_count =
+                        Common::Orbis::GetRedirectHotspots(hot, 8, &tracked_pages, &dropped);
+                    Ps4::Log("   redirect hotspot table: %lu tracked pages, %lu collision drops; top %lu:",
+                             static_cast<unsigned long>(tracked_pages),
+                             static_cast<unsigned long>(dropped),
+                             static_cast<unsigned long>(hot_count));
+                    for (std::size_t i = 0; i < hot_count; ++i) {
+                        Ps4::Log("      #%lu page 0x%lx: %lu redirects (cause %u)",
+                                 static_cast<unsigned long>(i + 1),
+                                 static_cast<unsigned long>(hot[i].address_page),
+                                 static_cast<unsigned long>(hot[i].count), hot[i].reason);
+                    }
+                }
             }
             CheckHeapEnvironment();
             if (++status_count % 3 == 1) {
