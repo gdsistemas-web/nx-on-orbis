@@ -8,14 +8,14 @@ slow-path redirects can be identified without logging from the handler. The
 frontend can periodically print the hottest pages and determine whether the
 redirect storm is concentrated or broadly distributed.
 ---
- src/common/orbis_lazy_memory.cpp | 78 +++++++++++++++++++++++++++++++++
- src/common/orbis_lazy_memory.h   | 14 ++++++
- 2 files changed, 92 insertions(+)
+ src/common/orbis_lazy_memory.cpp | 81 +++++++++++++++++++++++++++++++++
+ src/common/orbis_lazy_memory.h   | 15 ++++++
+ 2 files changed, 96 insertions(+)
 
 diff --git a/src/common/orbis_lazy_memory.cpp b/src/common/orbis_lazy_memory.cpp
 --- a/src/common/orbis_lazy_memory.cpp
 +++ b/src/common/orbis_lazy_memory.cpp
-@@ -152,6 +152,45 @@ std::atomic<std::size_t> g_view_conflicts{0};
+@@ -152,6 +152,48 @@ std::atomic<std::size_t> g_view_conflicts{0};
  // mapped (or maps other backing), 2 not readable, 3 write to a page mapped read-only, 4 other.
  std::atomic<std::size_t> g_redirect_reason[5]{};
  std::atomic<std::uintptr_t> g_redirect_sample[5]{};
@@ -64,7 +64,7 @@ diff --git a/src/common/orbis_lazy_memory.cpp b/src/common/orbis_lazy_memory.cpp
  
  std::uint64_t* ViewEntryLocked(std::size_t page, bool create) {
      const std::size_t span = page / PagesPerSpan;
-@@ -325,6 +364,7 @@ void FaultHandler(int signal, void* ucontext) {
+@@ -325,6 +367,7 @@ void FaultHandler(int signal, void* ucontext) {
          }
          g_redirect_reason[reason].fetch_add(1, std::memory_order_relaxed);
          g_redirect_sample[reason].store(sample, std::memory_order_relaxed);
@@ -72,7 +72,7 @@ diff --git a/src/common/orbis_lazy_memory.cpp b/src/common/orbis_lazy_memory.cpp
          return; // dynarmic sent the access down its slow path
      }
      if (const FaultChain next = g_next.load(std::memory_order_acquire)) {
-@@ -755,6 +795,44 @@ ViewStats GetViewStats() {
+@@ -755,5 +798,43 @@ ViewStats GetViewStats() {
      return stats;
  }
  
@@ -119,7 +119,7 @@ diff --git a/src/common/orbis_lazy_memory.cpp b/src/common/orbis_lazy_memory.cpp
 diff --git a/src/common/orbis_lazy_memory.h b/src/common/orbis_lazy_memory.h
 --- a/src/common/orbis_lazy_memory.h
 +++ b/src/common/orbis_lazy_memory.h
-@@ -102,6 +102,20 @@ struct ViewStats {
+@@ -102,5 +102,20 @@ struct ViewStats {
      std::uintptr_t redirect_sample[5];
  };
  ViewStats GetViewStats();
