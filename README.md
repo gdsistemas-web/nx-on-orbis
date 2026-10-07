@@ -1,5 +1,7 @@
 # NX on Orbis
 
+**English** | [Português (Brasil)](README.pt-BR.md)
+
 > **This is the `dev/fastmem-v1` continuation branch.** It is based on `experimental-fastmem` (tests 25-29) and adds **GD Test 30** fastmem hotspot diagnostics plus a reproducible Linux build/package path. The Test 30 PKG builds successfully on Linux; console validation is still pending. See [docs/GD-TEST30.md](docs/GD-TEST30.md).
 
 An experimental port of the **Eden** Nintendo Switch emulator (a yuzu fork) to a jailbroken
