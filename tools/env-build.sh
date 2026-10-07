@@ -28,6 +28,7 @@ export PS4_RANLIB="${PS4_RANLIB:-$(pick_tool llvm-ranlib-18 llvm-ranlib)}"
 export PS4_LD="${PS4_LD:-$(pick_tool ld.lld-18 ld.lld)}"
 
 # Prefer repo-local helper tools, but use the Linux host LLVM/CMake/Ninja from PATH.
+[ -x "$ROOT/tools/cmake/bin/cmake" ] && export PATH="$ROOT/tools/cmake/bin:$PATH"
 export PATH="$ROOT/tools/bin:$PATH"
 
 export PS4_CFLAGS="--target=x86_64-pc-freebsd12-elf -O2 -fPIC -funwind-tables -D__PS4__ -DPS4 -DORBIS -D__ORBIS__ -D_BSD_SOURCE=1 -U__FreeBSD__ -isysroot $PS4_SDK -isystem $PS4_OVERLAY -isystem $PS4_COMPAT/include -isystem $PS4_SDK/include -include orbis_prefix.h"
