@@ -15,7 +15,7 @@ Um port experimental do emulador de Nintendo Switch **Eden** (um fork do yuzu) p
 | Base | Eden `5f142c79` (commit fixado pelo port de PS5 ProsperoEden) + patches locais em `patches/eden/` |
 | Toolchain | OpenOrbis 0.5.4 + [orbis-sdk-v1](https://github.com/orbis-ports/orbis-porting-kit/releases/tag/orbis-sdk-v1) (orbis-compat, Mesa RADV para “Liverpool” GFX7), LLVM 18 e libc++ 18 compilada para PS4 |
 | Release estável anterior | [v0.1.0](../../releases/tag/v0.1.0): `.pkg` + ELF exato para simbolização de crashes |
-| Teste atual | GD Test 30: build e PKG Linux concluídos; validação no PS4 pendente |
+| Teste atual | [v0.2.0-test30](../../releases/tag/v0.2.0-test30): build e PKG Linux concluídos; validação no PS4 pendente |
 | Licença | GPL-3.0-or-later (veja `LICENSE` e `NOTICE.md`) |
 
 ## Sem afiliação com o Eden. Desenvolvido com apoio de IA.
