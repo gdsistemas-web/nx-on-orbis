@@ -10,6 +10,27 @@ else
   bash "$ROOT/scripts/build-libcxx18-linux.sh"
 fi
 
+CFG="$ROOT/libcxx18/include/c++/v1/__config_site"
+if [ -f "$CFG" ] && ! grep -q '^#undef __FreeBSD__
+if [ -f "$ROOT/prefix/lib/libssl.a" ] && [ -f "$ROOT/prefix/lib/libcrypto.a" ]; then
+  echo "== OpenSSL PS4 already ready; skipping"
+else
+  bash "$ROOT/scripts/build-openssl-linux.sh"
+fi
+
+if [ -f "$ROOT/prefix/lib/libavcodec.a" ] && [ -f "$ROOT/prefix/lib/libavutil.a" ]; then
+  echo "== FFmpeg PS4 already ready; skipping"
+else
+  bash "$ROOT/scripts/build-ffmpeg-linux.sh"
+fi
+
+echo
+bash "$ROOT/scripts/preflight-linux.sh"
+ "$CFG"; then
+  printf '\n#undef __FreeBSD__\n' >> "$CFG"
+  echo "== normalized libc++ target macros for Orbis"
+fi
+
 if [ -f "$ROOT/prefix/lib/libssl.a" ] && [ -f "$ROOT/prefix/lib/libcrypto.a" ]; then
   echo "== OpenSSL PS4 already ready; skipping"
 else
