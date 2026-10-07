@@ -7,9 +7,16 @@ fail=0
 ok(){ printf '  [OK]   %s\n' "$1"; }
 miss(){ printf '  [MISS] %s\n' "$1"; fail=1; }
 
-for t in cmake ninja clang clang++ llvm-ar llvm-ranlib ld.lld python3 make perl git; do
+for t in cmake ninja clang clang++ llvm-ar llvm-ranlib llvm-nm ld.lld python3 make perl git; do
   command -v "$t" >/dev/null 2>&1 && ok "$t -> $(command -v "$t")" || miss "$t"
 done
+
+clang_major="$(clang --version 2>/dev/null | sed -n '1s/.*version \([0-9][0-9]*\).*/\1/p')"
+if [ "$clang_major" = "18" ]; then
+  ok "clang major version 18"
+else
+  miss "clang 18 required/preferred (current: ${clang_major:-unknown})"
+fi
 
 [ -f "$ROOT/sdk-dl/orbis-sdk-v1/BUNDLE.txt" ] && ok "orbis-sdk-v1" || miss "orbis-sdk-v1 (run scripts/bootstrap-linux.sh)"
 [ -d "$ROOT/deps/eden/.git" ] && ok "patched Eden tree" || miss "deps/eden (run scripts/fetch-eden.sh)"
