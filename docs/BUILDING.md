@@ -115,6 +115,12 @@ Notes:
 bash package-eden.sh   # -> out-eden/IV0000-EDPS00001_00-EDENPS4000000000.pkg, ELF copy in elf/
 ```
 
+On Linux, `package-eden.sh` uses `sdk/bin/linux/create-fself` plus the bundle's
+`orbis-compat/scripts/ps4/make-pkg.sh`. The SDK bundle intentionally prunes OpenOrbis sample
+modules, so the script fetches exactly `libc.prx`, `libSceFios2.prx` and `right.sprx` from the
+OpenOrbis `v0.5.4` tag and verifies their Git blob IDs before use. No game, key or firmware files
+are downloaded.
+
 The package is laid out and signed like OpenOrbis's own samples (paid `0x3800000000000011`, default
 authinfo, `sce_module/libc.prx` + `libSceFios2.prx`, `sce_sys/about/right.sprx`, SFO category `gd`).
 That is the only layout that, on the test console, both starts and gets the full ~4.4 GiB of direct
