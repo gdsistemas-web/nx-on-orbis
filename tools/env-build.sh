@@ -17,6 +17,16 @@ export PS4_COMPAT="$SDK_BUNDLE/orbis-compat"
 export PS4_OVERLAY="$ROOT/toolchain/include-overlay"
 export PS4_PREFIX="$ROOT/prefix"
 
+pick_tool() {
+  local preferred="$1" fallback="$2"
+  if command -v "$preferred" >/dev/null 2>&1; then command -v "$preferred"; else command -v "$fallback"; fi
+}
+export PS4_CC="${PS4_CC:-$(pick_tool clang-18 clang)}"
+export PS4_CXX="${PS4_CXX:-$(pick_tool clang++-18 clang++)}"
+export PS4_AR="${PS4_AR:-$(pick_tool llvm-ar-18 llvm-ar)}"
+export PS4_RANLIB="${PS4_RANLIB:-$(pick_tool llvm-ranlib-18 llvm-ranlib)}"
+export PS4_LD="${PS4_LD:-$(pick_tool ld.lld-18 ld.lld)}"
+
 # Prefer repo-local helper tools, but use the Linux host LLVM/CMake/Ninja from PATH.
 export PATH="$ROOT/tools/bin:$PATH"
 
