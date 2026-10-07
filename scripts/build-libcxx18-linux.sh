@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build LLVM 18.1.8 libc++/libc++abi for the PS4.
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/deps/llvm-project"
 BUILD="$ROOT/build-libcxx18"
@@ -11,12 +12,38 @@ source "$ROOT/tools/env-build.sh"
 
 if [ ! -d "$SRC/.git" ]; then
   rm -rf "$SRC"
-  git clone --depth 1 --filter=blob:none --sparse --branch "$TAG"     https://github.com/llvm/llvm-project.git "$SRC"
-  git -C "$SRC" sparse-checkout set runtimes libcxx libcxxabi libunwind cmake llvm/cmake
+  git clone --depth 1 --filter=blob:none --sparse --branch "$TAG" \
+    https://github.com/llvm/llvm-project.git "$SRC"
 fi
 
+# runtimes/CMakeLists.txt still adds llvm/utils/llvm-lit even with runtime tests disabled.
+# Keep this outside the clone-only block so rerunning repairs an existing sparse checkout.
+git -C "$SRC" sparse-checkout set \
+  runtimes \
+  libcxx \
+  libcxxabi \
+  libunwind \
+  cmake \
+  llvm/cmake \
+  llvm/utils/llvm-lit
+
 rm -rf "$BUILD"
-cmake -S "$SRC/runtimes" -B "$BUILD" -G Ninja   -DCMAKE_TOOLCHAIN_FILE="$ROOT/toolchain/runtimes-ps4.cmake"   -DCMAKE_BUILD_TYPE=Release   -DCMAKE_INSTALL_PREFIX="$PREFIX"   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi"   -DLIBCXX_ENABLE_SHARED=OFF   -DLIBCXXABI_ENABLE_SHARED=OFF   -DLIBCXX_HAS_MUSL_LIBC=ON   -DLIBCXX_CXX_ABI=libcxxabi   -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF   -DLIBCXXABI_USE_LLVM_UNWINDER=OFF   -DLIBCXX_ENABLE_TIME_ZONE_DATABASE=OFF   -DLIBCXX_INCLUDE_BENCHMARKS=OFF   -DLIBCXX_INCLUDE_TESTS=OFF   -DLIBCXXABI_INCLUDE_TESTS=OFF
+
+cmake -S "$SRC/runtimes" -B "$BUILD" -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$ROOT/toolchain/runtimes-ps4.cmake" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
+  -DLIBCXX_ENABLE_SHARED=OFF \
+  -DLIBCXXABI_ENABLE_SHARED=OFF \
+  -DLIBCXX_HAS_MUSL_LIBC=ON \
+  -DLIBCXX_CXX_ABI=libcxxabi \
+  -DLIBCXX_ENABLE_NEW_DELETE_DEFINITIONS=OFF \
+  -DLIBCXXABI_USE_LLVM_UNWINDER=OFF \
+  -DLIBCXX_ENABLE_TIME_ZONE_DATABASE=OFF \
+  -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
+  -DLIBCXX_INCLUDE_TESTS=OFF \
+  -DLIBCXXABI_INCLUDE_TESTS=OFF
 
 cmake --build "$BUILD" -j"$(nproc)"
 cmake --install "$BUILD"
