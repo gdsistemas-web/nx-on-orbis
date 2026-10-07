@@ -24,4 +24,4 @@ if $link; then
            -lc++ -lc++abi -lunwind -lc -lkernel "$PS4_SDK/lib/crt1.o")
 fi
 
-exec clang $PS4_CFLAGS -ffunction-sections -fdata-sections "${args[@]}"
+exec "$PS4_CC" $PS4_CFLAGS -ffunction-sections -fdata-sections "${args[@]}"
