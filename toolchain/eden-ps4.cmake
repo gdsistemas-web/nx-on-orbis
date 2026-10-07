@@ -25,5 +25,5 @@ string(REPLACE "-L${OO_PS4_TOOLCHAIN}/lib" "-L${EDEN_PS4_LIBCXX}/lib -L${OO_PS4_
 set(CMAKE_C_STANDARD_LIBRARIES   "-lc++experimental -lc++ -lc++abi -lunwind -lc -lkernel ${ORBIS_CRT1}")
 set(CMAKE_CXX_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES}")
 
-set(CMAKE_C_FLAGS_INIT "${CMAKE_C_FLAGS_INIT} -fno-omit-frame-pointer -femulated-tls -march=btver2")
-set(CMAKE_CXX_FLAGS_INIT "${CMAKE_CXX_FLAGS_INIT} -fno-omit-frame-pointer -femulated-tls -march=btver2")
+set(CMAKE_C_FLAGS_INIT "${CMAKE_C_FLAGS_INIT} -U__FreeBSD__ -fno-omit-frame-pointer -femulated-tls -march=btver2")
+set(CMAKE_CXX_FLAGS_INIT "${CMAKE_CXX_FLAGS_INIT} -U__FreeBSD__ -fno-omit-frame-pointer -femulated-tls -march=btver2")
