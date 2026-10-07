@@ -1,0 +1,144 @@
+From 7f7ad9f3c1b7d1b1f6c7a5d21e80f55da5a0c032 Mon Sep 17 00:00:00 2001
+From: GD Sistemas Web <dev@gdsistemas.com.br>
+Date: Wed, 7 Oct 2026 19:02:00 -0300
+Subject: [PATCH 32/32] ORBIS: track hot fastmem redirect pages
+
+Keep a small fixed-size, allocation-free table in the exception path so repeated
+slow-path redirects can be identified without logging from the handler. The
+frontend can periodically print the hottest pages and determine whether the
+redirect storm is concentrated or broadly distributed.
+---
+ src/common/orbis_lazy_memory.cpp | 78 +++++++++++++++++++++++++++++++++
+ src/common/orbis_lazy_memory.h   | 14 ++++++
+ 2 files changed, 92 insertions(+)
+
+diff --git a/src/common/orbis_lazy_memory.cpp b/src/common/orbis_lazy_memory.cpp
+--- a/src/common/orbis_lazy_memory.cpp
++++ b/src/common/orbis_lazy_memory.cpp
+@@ -152,6 +152,45 @@ std::atomic<std::size_t> g_view_conflicts{0};
+ // mapped (or maps other backing), 2 not readable, 3 write to a page mapped read-only, 4 other.
+ std::atomic<std::size_t> g_redirect_reason[5]{};
+ std::atomic<std::uintptr_t> g_redirect_sample[5]{};
++
++// Diagnostic only: approximate the hottest 4 KiB pages that force dynarmic off fastmem.
++// This runs from the exception handler, so it must not allocate, log or take a blocking lock.
++// 1024 slots are ~24 KiB and eight linear probes keep the handler cost bounded.
++constexpr std::size_t RedirectHotSlots = 1024;
++constexpr std::size_t RedirectHotProbes = 8;
++static_assert((RedirectHotSlots & (RedirectHotSlots - 1)) == 0);
++
++struct RedirectHotSlot {
++    std::atomic<std::uintptr_t> page_key{0}; // (address >> 12) + 1; zero means unused
++    std::atomic<std::size_t> count{0};
++    std::atomic<unsigned> reason{0};
++};
++
++RedirectHotSlot g_redirect_hot[RedirectHotSlots]{};
++std::atomic<std::size_t> g_redirect_hot_claimed{0};
++std::atomic<std::size_t> g_redirect_hot_dropped{0};
++
++void RecordRedirectHotspot(std::uintptr_t address, unsigned reason) {
++    const std::uintptr_t page = address >> 12;
++    const std::uintptr_t key = page + 1;
++    std::size_t slot =
++        static_cast<std::size_t>(page * std::uintptr_t{11400714819323198485ull}) &
++        (RedirectHotSlots - 1);
++    for (std::size_t probe = 0; probe < RedirectHotProbes; ++probe) {
++        auto& hot = g_redirect_hot[slot];
++        std::uintptr_t observed = hot.page_key.load(std::memory_order_relaxed);
++        if (observed == key) {
++            hot.count.fetch_add(1, std::memory_order_relaxed);
++            return;
++        }
++        if (observed == 0 &&
++            hot.page_key.compare_exchange_strong(observed, key, std::memory_order_relaxed)) {
++            hot.reason.store(reason, std::memory_order_relaxed);
++            hot.count.fetch_add(1, std::memory_order_relaxed);
++            g_redirect_hot_claimed.fetch_add(1, std::memory_order_relaxed);
++            return;
++        }
++        slot = (slot + 1) & (RedirectHotSlots - 1);
++    }
++    g_redirect_hot_dropped.fetch_add(1, std::memory_order_relaxed);
++}
+ 
+ std::uint64_t* ViewEntryLocked(std::size_t page, bool create) {
+     const std::size_t span = page / PagesPerSpan;
+@@ -325,6 +364,7 @@ void FaultHandler(int signal, void* ucontext) {
+         }
+         g_redirect_reason[reason].fetch_add(1, std::memory_order_relaxed);
+         g_redirect_sample[reason].store(sample, std::memory_order_relaxed);
++        RecordRedirectHotspot(sample, static_cast<unsigned>(reason));
+         return; // dynarmic sent the access down its slow path
+     }
+     if (const FaultChain next = g_next.load(std::memory_order_acquire)) {
+@@ -755,6 +795,44 @@ ViewStats GetViewStats() {
+     return stats;
+ }
+ 
++std::size_t GetRedirectHotspots(RedirectHotspot* out, std::size_t capacity,
++                                std::size_t* tracked_pages, std::size_t* dropped) {
++    if (tracked_pages != nullptr) {
++        *tracked_pages = g_redirect_hot_claimed.load(std::memory_order_relaxed);
++    }
++    if (dropped != nullptr) {
++        *dropped = g_redirect_hot_dropped.load(std::memory_order_relaxed);
++    }
++    if (out == nullptr || capacity == 0) {
++        return 0;
++    }
++
++    std::size_t used = 0;
++    for (const auto& slot : g_redirect_hot) {
++        const std::size_t count = slot.count.load(std::memory_order_relaxed);
++        const std::uintptr_t key = slot.page_key.load(std::memory_order_relaxed);
++        if (count == 0 || key == 0) {
++            continue;
++        }
++        RedirectHotspot item{(key - 1) << 12, count,
++                             slot.reason.load(std::memory_order_relaxed)};
++        std::size_t pos = 0;
++        while (pos < used && out[pos].count >= item.count) {
++            ++pos;
++        }
++        if (pos >= capacity) {
++            continue;
++        }
++        const std::size_t new_used = used < capacity ? used + 1 : used;
++        for (std::size_t i = new_used - 1; i > pos; --i) {
++            out[i] = out[i - 1];
++        }
++        out[pos] = item;
++        used = new_used;
++    }
++    return used;
++}
++
+ 
+ } // namespace Common::Orbis
+diff --git a/src/common/orbis_lazy_memory.h b/src/common/orbis_lazy_memory.h
+--- a/src/common/orbis_lazy_memory.h
++++ b/src/common/orbis_lazy_memory.h
+@@ -102,6 +102,20 @@ struct ViewStats {
+     std::uintptr_t redirect_sample[5];
+ };
+ ViewStats GetViewStats();
++
++/// Fixed-table redirect diagnostics. address_page is a 4 KiB-aligned guest view offset for
++/// in-view redirects; for "outside" redirects it is the aligned fault address.
++struct RedirectHotspot {
++    std::uintptr_t address_page;
++    std::size_t count;
++    unsigned reason;
++};
++
++/// Returns up to capacity entries sorted by redirect count, hottest first. This scans a fixed
++/// table and is intended for periodic frontend diagnostics, never for the exception handler.
++/// tracked_pages is the number of distinct pages claimed in the table; dropped counts redirect
++/// events that could not be inserted within the bounded probe count.
++std::size_t GetRedirectHotspots(RedirectHotspot* out, std::size_t capacity,
++                                std::size_t* tracked_pages, std::size_t* dropped);
+ 
+ } // namespace Common::Orbis
+-- 
+2.56.0
