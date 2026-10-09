@@ -198,22 +198,22 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
         c.Print(Left + 48, ListTop + 100, fastmemOn ? "ATIVADA (EXPERIMENTAL)" : "DESATIVADA (RECOMENDADA)", Accent, Panel);
         c.Print(Left + 48, ListTop + 165, "X  Alternar fastmem", Muted, Panel);
         c.Print(Left + 48, ListTop + 220, "O ajuste passa a valer no proximo inicio.", Muted, Panel);
-        c.Print(Left + 48, ListTop + 290, "No PS4 Fat, fastmem ON apresentou 23 FPS", Muted, Panel);
-        c.Print(Left + 48, ListTop + 340, "e OFF apresentou 60 FPS no Homebrew Menu.", Muted, Panel);
+        c.Print(Left + 48, ListTop + 290, "Teste anterior no PS4 Fat: ON ~23 FPS", Muted, Panel);
+        c.Print(Left + 48, ListTop + 340, "OFF ~60 FPS no Homebrew Menu.", Muted, Panel);
         if (saveError) c.Print(Left + 48, ListTop + 420, "ERRO: nao foi possivel salvar settings.txt", Accent, Panel);
     } else {
-    for (int row = 0; row < Rows && first + row < count; ++row) {
-        const int index = first + row;
-        const int y = ListTop + row * RowHeight;
-        const bool on = index == selected;
-        const uint32_t surface = on ? Selected : Panel;
-        c.Fill(Left + 16, y + 2, ListWidth - 32, RowHeight - 7, surface);
-        if (on) {
-            c.Fill(Left + 16, y + 2, 7, RowHeight - 7, Accent);
+        for (int row = 0; row < Rows && first + row < count; ++row) {
+            const int index = first + row;
+            const int y = ListTop + row * RowHeight;
+            const bool on = index == selected;
+            const uint32_t surface = on ? Selected : Panel;
+            c.Fill(Left + 16, y + 2, ListWidth - 32, RowHeight - 7, surface);
+            if (on) {
+                c.Fill(Left + 16, y + 2, 7, RowHeight - 7, Accent);
+            }
+            c.Print(Left + 48, y + 23, DisplayName(names[index]), on ? White : Muted,
+                    surface, MaxChars);
         }
-        c.Print(Left + 48, y + 23, DisplayName(names[index]), on ? White : Muted,
-                surface, MaxChars);
-    }
     }
     if (!settingsOpen && first > 0) {
         c.Print(Left + ListWidth - 52, ListTop - 4, "^", Accent, Panel);
@@ -229,7 +229,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     c.Print(SideX + 52, ListTop + 24, "GD TEST 31", White, Panel);
     c.Print(SideX + 26, ListTop + 110, "MODO SEGURO", Accent, Panel);
     c.Print(SideX + 26, ListTop + 160, fastmemOn ? "Fastmem: ON (experimental)" : "Fastmem: OFF (padrao)", White, Panel);
-    c.Print(SideX + 26, ListTop + 212, "Ativar via settings.txt", Muted, Panel);
+    c.Print(SideX + 26, ListTop + 212, "Quadrado: configuracoes", Muted, Panel);
     c.Fill(SideX + 24, ListTop + 266, 462, 2, 0xFF2B3750);
     c.Print(SideX + 26, ListTop + 310, "Sem jogos instalados?", White, Panel);
     c.Print(SideX + 26, ListTop + 356, "Teste o Homebrew Menu", Muted, Panel);
