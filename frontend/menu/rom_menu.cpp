@@ -113,40 +113,76 @@ std::string DisplayName(const std::string& file) {
     return name;
 }
 
+// GD Edition palette: lightweight native graphics, no extra video allocations.
 void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
-    constexpr int Left = 120;
-    constexpr int RowHeight = 56;
-    constexpr int ListTop = 220;
-    constexpr int Rows = 13;
-    constexpr size_t MaxChars = (Width - 2 * Left - 40) / MenuFont::Width;
-    c.Fill(0, 0, Width, Height, Background);
-    c.Print(Left, 90, "Eden PS4 - elegi un juego", Text, Background);
-    c.Fill(Left, 150, Width - 2 * Left, 3, Dim);
+    constexpr uint32_t Base = 0xFF0B1120;
+    constexpr uint32_t Panel = 0xFF182238;
+    constexpr uint32_t Selected = 0xFF283B58;
+    constexpr uint32_t Accent = 0xFFFF6B00;
+    constexpr uint32_t White = 0xFFF7F9FD;
+    constexpr uint32_t Muted = 0xFFB1BDD2;
+    constexpr int Left = 112;
+    constexpr int ListTop = 302;
+    constexpr int RowHeight = 66;
+    constexpr int Rows = 9;
+    constexpr int ListWidth = 1140;
+    constexpr size_t MaxChars = (ListWidth - 90) / MenuFont::Width;
 
+    c.Fill(0, 0, Width, Height, Base);
+    // Brand rail and heading.
+    c.Fill(0, 0, 12, Height, Accent);
+    c.Fill(Left, 78, 70, 70, Accent);
+    c.Print(Left + 20, 102, "GD", White, Accent);
+    c.Print(Left + 100, 84, "NX ON ORBIS", White, Base);
+    c.Print(Left + 100, 124, "GD EDITION  /  TEST 31", Muted, Base);
+    c.Fill(Left, 183, Width - Left * 2, 2, 0xFF2B3750);
+
+    c.Print(Left, 216, "BIBLIOTECA", White, Base);
+    c.Print(Left, 253, "Selecione um aplicativo para iniciar", Muted, Base);
+
+    // Single-column game list; reserve the right-hand pane for diagnostics.
+    c.Fill(Left, ListTop - 12, ListWidth, 650, Panel);
     const int count = int(names.size());
     const int first = std::clamp(selected - Rows / 2, 0, std::max(count - Rows, 0));
     for (int row = 0; row < Rows && first + row < count; ++row) {
         const int index = first + row;
         const int y = ListTop + row * RowHeight;
         const bool on = index == selected;
+        const uint32_t surface = on ? Selected : Panel;
+        c.Fill(Left + 16, y + 2, ListWidth - 32, RowHeight - 7, surface);
         if (on) {
-            c.Fill(Left, y - 8, Width - 2 * Left, RowHeight - 4, Highlight);
+            c.Fill(Left + 16, y + 2, 7, RowHeight - 7, Accent);
         }
-        c.Print(Left + 20, y, DisplayName(names[index]), on ? 0xFFFFFFFF : Text,
-                on ? Highlight : Background, MaxChars);
+        c.Print(Left + 48, y + 23, DisplayName(names[index]), on ? White : Muted,
+                surface, MaxChars);
     }
     if (first > 0) {
-        c.Print(Width - Left - MenuFont::Width, ListTop - 50, "^", Dim, Background);
+        c.Print(Left + ListWidth - 52, ListTop - 4, "^", Accent, Panel);
     }
     if (first + Rows < count) {
-        c.Print(Width - Left - MenuFont::Width, ListTop + Rows * RowHeight, "v", Dim, Background);
+        c.Print(Left + ListWidth - 52, ListTop + Rows * RowHeight, "v", Accent, Panel);
     }
-    c.Fill(Left, Height - 130, Width - 2 * Left, 3, Dim);
-    c.Print(Left, Height - 100, "Arriba/Abajo: elegir    X: jugar", Dim, Background);
+
+    // Side information is intentionally static: no fake performance readings.
+    constexpr int SideX = 1290;
+    c.Fill(SideX, ListTop - 12, 510, 650, Panel);
+    c.Fill(SideX + 24, ListTop + 20, 6, 54, Accent);
+    c.Print(SideX + 52, ListTop + 24, "GD TEST 31", White, Panel);
+    c.Print(SideX + 26, ListTop + 110, "MODO SEGURO", Accent, Panel);
+    c.Print(SideX + 26, ListTop + 160, "Fastmem: OFF (padrao)", White, Panel);
+    c.Print(SideX + 26, ListTop + 212, "Ativar via settings.txt", Muted, Panel);
+    c.Fill(SideX + 24, ListTop + 266, 462, 2, 0xFF2B3750);
+    c.Print(SideX + 26, ListTop + 310, "Sem jogos instalados?", White, Panel);
+    c.Print(SideX + 26, ListTop + 356, "Teste o Homebrew Menu", Muted, Panel);
+    c.Print(SideX + 26, ListTop + 402, "ou adicione ROMs via FTP.", Muted, Panel);
+    c.Print(SideX + 26, ListTop + 534, "Build experimental", Accent, Panel);
+
+    c.Fill(Left, Height - 100, Width - Left * 2, 2, 0xFF2B3750);
+    c.Print(Left, Height - 72, "UP/DOWN  Navegar     X  Iniciar", Muted, Base);
     char position[32];
     std::snprintf(position, sizeof(position), "%d / %d", selected + 1, count);
-    c.Print(Width - Left - int(std::strlen(position)) * MenuFont::Width, Height - 100, position,
-            Dim, Background);
+    c.Print(Width - Left - int(std::strlen(position)) * MenuFont::Width,
+            Height - 72, position, Accent, Base);
 }
 
 } // Anonymous namespace
