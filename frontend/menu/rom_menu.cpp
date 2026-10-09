@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -105,6 +107,53 @@ struct Canvas {
     }
 };
 
+// Read the persisted fastmem mode (default OFF) without initializing Eden.
+bool ReadFastmemSetting() {
+    std::ifstream in{"/data/edenps4/settings.txt"};
+    std::string line;
+    bool on = false;
+    while (std::getline(in, line)) {
+        const auto comment = line.find('#');
+        if (comment != std::string::npos) line.erase(comment);
+        line.erase(std::remove_if(line.begin(), line.end(),
+            [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r'; }), line.end());
+        if (line == "fastmem=on") on = true;
+        if (line == "fastmem=off") on = false;
+    }
+    return on;
+}
+
+// Save atomically, retaining unrelated settings (including custom driver options).
+bool WriteFastmemSetting(bool on) {
+    namespace fs = std::filesystem;
+    const fs::path path{"/data/edenps4/settings.txt"};
+    const fs::path temporary{"/data/edenps4/settings.txt.tmp"};
+    std::vector<std::string> lines;
+    {
+        std::ifstream input{path};
+        for (std::string line; std::getline(input, line);) {
+            std::string check = line;
+            const auto comment = check.find('#');
+            if (comment != std::string::npos) check.erase(comment);
+            check.erase(std::remove_if(check.begin(), check.end(),
+                [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r'; }), check.end());
+            if (check.rfind("fastmem=", 0) != 0) lines.push_back(line);
+        }
+    }
+    std::ofstream out{temporary, std::ios::trunc};
+    if (!out) return false;
+    for (const auto& line : lines) out << line << '\n';
+    out << "fastmem=" << (on ? "on" : "off") << '\n';
+    out.flush();
+    if (!out.good()) { out.close(); std::error_code ec; fs::remove(temporary, ec); return false; }
+    out.close();
+    std::error_code ec;
+    fs::rename(temporary, path, ec);
+    if (ec) { fs::remove(temporary, ec); return false; }
+    Ps4::Log("menu: persisted fastmem=%s (effective next launch)", on ? "on" : "off");
+    return true;
+}
+
 std::string DisplayName(const std::string& file) {
     std::string name = file;
     if (const auto dot = name.find_last_of('.'); dot != std::string::npos && dot > 0) {
@@ -114,7 +163,7 @@ std::string DisplayName(const std::string& file) {
 }
 
 // GD Edition palette: lightweight native graphics, no extra video allocations.
-void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
+void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool fastmemOn, bool settingsOpen, bool saveError) {
     constexpr uint32_t Base = 0xFF0B1120;
     constexpr uint32_t Panel = 0xFF182238;
     constexpr uint32_t Selected = 0xFF283B58;
@@ -137,13 +186,22 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
     c.Print(Left + 100, 124, "GD EDITION  /  TEST 31", Muted, Base);
     c.Fill(Left, 183, Width - Left * 2, 2, 0xFF2B3750);
 
-    c.Print(Left, 216, "BIBLIOTECA", White, Base);
-    c.Print(Left, 253, "Selecione um aplicativo para iniciar", Muted, Base);
+    c.Print(Left, 216, settingsOpen ? "CONFIGURACOES" : "BIBLIOTECA", White, Base);
+    c.Print(Left, 253, settingsOpen ? "Ajustes experimentais do emulador" : "Selecione um aplicativo para iniciar", Muted, Base);
 
     // Single-column game list; reserve the right-hand pane for diagnostics.
     c.Fill(Left, ListTop - 12, ListWidth, 650, Panel);
     const int count = int(names.size());
     const int first = std::clamp(selected - Rows / 2, 0, std::max(count - Rows, 0));
+    if (settingsOpen) {
+        c.Print(Left + 48, ListTop + 45, "FASTMEM", White, Panel);
+        c.Print(Left + 48, ListTop + 100, fastmemOn ? "ATIVADA (EXPERIMENTAL)" : "DESATIVADA (RECOMENDADA)", Accent, Panel);
+        c.Print(Left + 48, ListTop + 165, "X  Alternar fastmem", Muted, Panel);
+        c.Print(Left + 48, ListTop + 220, "O ajuste passa a valer no proximo inicio.", Muted, Panel);
+        c.Print(Left + 48, ListTop + 290, "No PS4 Fat, fastmem ON apresentou 23 FPS", Muted, Panel);
+        c.Print(Left + 48, ListTop + 340, "e OFF apresentou 60 FPS no Homebrew Menu.", Muted, Panel);
+        if (saveError) c.Print(Left + 48, ListTop + 420, "ERRO: nao foi possivel salvar settings.txt", Accent, Panel);
+    } else {
     for (int row = 0; row < Rows && first + row < count; ++row) {
         const int index = first + row;
         const int y = ListTop + row * RowHeight;
@@ -156,10 +214,11 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
         c.Print(Left + 48, y + 23, DisplayName(names[index]), on ? White : Muted,
                 surface, MaxChars);
     }
-    if (first > 0) {
+    }
+    if (!settingsOpen && first > 0) {
         c.Print(Left + ListWidth - 52, ListTop - 4, "^", Accent, Panel);
     }
-    if (first + Rows < count) {
+    if (!settingsOpen && first + Rows < count) {
         c.Print(Left + ListWidth - 52, ListTop + Rows * RowHeight, "v", Accent, Panel);
     }
 
@@ -169,7 +228,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
     c.Fill(SideX + 24, ListTop + 20, 6, 54, Accent);
     c.Print(SideX + 52, ListTop + 24, "GD TEST 31", White, Panel);
     c.Print(SideX + 26, ListTop + 110, "MODO SEGURO", Accent, Panel);
-    c.Print(SideX + 26, ListTop + 160, "Fastmem: OFF (padrao)", White, Panel);
+    c.Print(SideX + 26, ListTop + 160, fastmemOn ? "Fastmem: ON (experimental)" : "Fastmem: OFF (padrao)", White, Panel);
     c.Print(SideX + 26, ListTop + 212, "Ativar via settings.txt", Muted, Panel);
     c.Fill(SideX + 24, ListTop + 266, 462, 2, 0xFF2B3750);
     c.Print(SideX + 26, ListTop + 310, "Sem jogos instalados?", White, Panel);
@@ -178,7 +237,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
     c.Print(SideX + 26, ListTop + 534, "Build experimental", Accent, Panel);
 
     c.Fill(Left, Height - 100, Width - Left * 2, 2, 0xFF2B3750);
-    c.Print(Left, Height - 72, "UP/DOWN  Navegar     X  Iniciar", Muted, Base);
+    c.Print(Left, Height - 72, settingsOpen ? "X  Alternar     O  Voltar" : "UP/DOWN  Navegar    X  Iniciar    []  Ajustes", Muted, Base);
     char position[32];
     std::snprintf(position, sizeof(position), "%d / %d", selected + 1, count);
     c.Print(Width - Left - int(std::strlen(position)) * MenuFont::Width,
@@ -227,13 +286,16 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
     Ps4::Log("menu: %zu games listed", names.size());
 
     int selected = std::clamp(initial, 0, int(names.size()) - 1);
+    bool fastmemOn = ReadFastmemSetting();
+    bool settingsOpen = false;
+    bool saveError = false;
     int back = 0;
     const auto present = [&] {
         while (sceVideoOutIsFlipPending(handle) > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         Canvas canvas{static_cast<uint32_t*>(buffers[back])};
-        Draw(canvas, names, selected);
+        Draw(canvas, names, selected, fastmemOn, settingsOpen, saveError);
         sceVideoOutSubmitFlip(handle, back, FlipVsync, 0);
         back ^= 1;
     };
@@ -251,8 +313,28 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
         }
         const std::uint32_t pressed = now & ~previous;
         previous = now;
+        if (pressed & Ps4::Button::Square) {
+            settingsOpen = !settingsOpen;
+            saveError = false;
+            present();
+            continue;
+        }
+        if (settingsOpen && (pressed & Ps4::Button::Circle)) {
+            settingsOpen = false;
+            present();
+            continue;
+        }
         if (pressed & Ps4::Button::Cross) {
-            break;
+            if (!settingsOpen) break;
+            const bool desired = !fastmemOn;
+            saveError = !WriteFastmemSetting(desired);
+            if (!saveError) fastmemOn = desired;
+            present();
+            continue;
+        }
+        if (settingsOpen) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            continue;
         }
         int step = 0;
         const std::uint32_t vertical = now & (Ps4::Button::Up | Ps4::Button::Down);
