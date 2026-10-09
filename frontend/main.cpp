@@ -159,7 +159,11 @@ std::string FindGame() {
     // package, which needs no keys or firmware - a first test of CPU, GPU and presentation.
     const fs::path bundled{"/app0/assets/misc/hbmenu.nro"};
     if (fs::is_regular_file(bundled, ec)) {
-        Ps4::Log("no game of yours found; starting the bundled Homebrew Menu");
+        Ps4::Log("no game of yours found; opening GD library with bundled Homebrew Menu");
+        Ps4::SetPadLight(255, 107, 0);
+        const std::vector<std::string> included{"Homebrew Menu (included).nro"};
+        // Failure to open the menu still falls back to the bundled test.
+        RunRomMenu(included, 0);
         return bundled.string();
     }
     return {};
@@ -262,7 +266,7 @@ void ApplyPs4Settings() {
 ///   reactive_flushing=on|off    (default off)
 ///   profile=on|off              sampling profiler in boot.log (default on)
 ///   cpu_accuracy=unsafe|auto|accurate (default unsafe)
-///   fastmem=on|off              (default on; needs cpu_accuracy=unsafe)
+///   fastmem=on|off              (default off on PS4; needs cpu_accuracy=unsafe)
 ///   async_shaders=on|off        (default on)
 ///   env=NAME=VALUE              environment for the PS4 driver (e.g. env=RADV_DEBUG=info,nohiz)
 // The environment, moved out of the heap once every setenv is done (test 29). Test 28 crashed in
@@ -487,7 +491,7 @@ void CheckMutexes() {
 int main() {
     Ps4::OpenBootLog();
     Ps4::Log("eden-ps4 starting (Eden %s %s)", Common::g_scm_branch, Common::g_scm_desc);
-    Ps4::Log("PS4 build: %s; GD test 30: fastmem redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
+    Ps4::Log("PS4 build: %s; GD test 31: safe default fastmem off; redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
              EDEN_PS4_BUILD_ID);
     Ps4::InstallCrashReporting();
     Ps4::StartWatchdog();
@@ -542,6 +546,9 @@ int main() {
 
     Ps4::SetPhase("core init");
     ApplyPs4Settings();
+    // GD Test 31: prefer the stable path measured on the PS4 Fat Homebrew Menu.
+    // An explicit fastmem=on in settings.txt still enables experiments.
+    Settings::values.cpuopt_unsafe_host_mmu.SetValue(false);
     ApplySettingsFile();
     MoveEnvironmentOutOfHeap();
     if (Settings::IsFastmemEnabled()) {
