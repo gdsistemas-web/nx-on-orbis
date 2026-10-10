@@ -491,7 +491,7 @@ void CheckMutexes() {
 int main() {
     Ps4::OpenBootLog();
     Ps4::Log("eden-ps4 starting (Eden %s %s)", Common::g_scm_branch, Common::g_scm_desc);
-    Ps4::Log("PS4 build: %s; GD test 31: safe default fastmem off; redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
+    Ps4::Log("PS4 build: %s; GD test 32: safe default fastmem off; redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
              EDEN_PS4_BUILD_ID);
     Ps4::InstallCrashReporting();
     Ps4::StartWatchdog();
