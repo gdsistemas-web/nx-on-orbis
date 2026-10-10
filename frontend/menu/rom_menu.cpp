@@ -155,26 +155,34 @@ bool WriteFastmemSetting(bool on) {
 }
 
 struct BootSummary {
-    std::string build = "Sem registro";
-    std::string status = "Sem medicao";
-    std::string fastmem = "Sem medicao";
+    std::string build = "Nenhuma sessao anterior";
+    std::string status = "Sem FPS anterior";
+    std::string fastmem = "Sem dado anterior";
 };
 BootSummary ReadBootSummary() {
     BootSummary summary;
-    std::ifstream in{"/data/edenps4/boot.log"};
+    // OpenBootLog() already rotates boot.log to boot.old.log at launch.
+    // The current boot has no game FPS until AFTER this native menu exits.
+    std::ifstream in{"/data/edenps4/boot.old.log"};
     std::string line;
     std::size_t count = 0;
-    // Only parse bounded text; never allow a large log to stall the menu.
+    // Bounded historical read; no live polling and no changes to log rotation.
     while (count++ < 20000 && std::getline(in, line)) {
         if (line.size() > 1024) continue;
-        const auto take = [&](const char* marker, std::string& dest) {
-            const auto pos = line.find(marker);
-            if (pos != std::string::npos) dest = line.substr(pos, 110);
-        };
-        take("PS4 build:", summary.build);
-        take("status: game ", summary.status);
-        take("fastmem: view ", summary.fastmem);
-        take("fastmem: off ", summary.fastmem);
+        if (const auto pos = line.find("PS4 build:"); pos != std::string::npos) {
+            const auto first = pos + std::strlen("PS4 build:");
+            const auto last = line.find(';', first);
+            summary.build = line.substr(first, std::min(last == std::string::npos ? line.size() - first : last - first, size_t(64)));
+        }
+        if (const auto pos = line.find("status: game "); pos != std::string::npos) {
+            const auto last = line.find(", guest+tables", pos);
+            summary.status = line.substr(pos + 8, std::min(last == std::string::npos ? line.size() - pos - 8 : last - pos - 8, size_t(90)));
+        }
+        for (const char* marker : {"fastmem: view ", "fastmem: off "}) {
+            if (const auto pos = line.find(marker); pos != std::string::npos) {
+                summary.fastmem = line.substr(pos, 90);
+            }
+        }
     }
     return summary;
 }
@@ -208,11 +216,11 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     c.Fill(Left, 78, 70, 70, Accent);
     c.Print(Left + 20, 102, "GD", White, Accent);
     c.Print(Left + 100, 84, "NX ON ORBIS", White, Base);
-    c.Print(Left + 100, 124, "GD EDITION  /  TEST 31", Muted, Base);
+    c.Print(Left + 100, 124, "GD EDITION  /  TEST 33", Muted, Base);
     c.Fill(Left, 183, Width - Left * 2, 2, 0xFF2B3750);
 
     c.Print(Left, 216, settingsOpen ? "CONFIGURACOES" : diagnosticsOpen ? "DIAGNOSTICOS" : "BIBLIOTECA", White, Base);
-    c.Print(Left, 253, settingsOpen ? "Ajustes experimentais do emulador" : diagnosticsOpen ? "Dados registrados no ultimo boot" : "Selecione um aplicativo para iniciar", Muted, Base);
+    c.Print(Left, 253, settingsOpen ? "Ajustes experimentais do emulador" : diagnosticsOpen ? "Resultados da sessao anterior" : "Selecione um aplicativo para iniciar", Muted, Base);
 
     // Single-column game list; reserve the right-hand pane for diagnostics.
     c.Fill(Left, ListTop - 12, ListWidth, 650, Panel);
@@ -227,13 +235,13 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
         c.Print(Left + 48, ListTop + 340, "OFF ~60 FPS no Homebrew Menu.", Muted, Panel);
         if (saveError) c.Print(Left + 48, ListTop + 420, "ERRO: nao foi possivel salvar settings.txt", Accent, Panel);
     } else if (diagnosticsOpen) {
-        c.Print(Left + 48, ListTop + 42, "ULTIMA BUILD REGISTRADA", Accent, Panel);
-        c.Print(Left + 48, ListTop + 90, summary.build, White, Panel, 63);
+        c.Print(Left + 48, ListTop + 42, "BUILD DA SESSAO ANTERIOR", Accent, Panel);
+        c.Print(Left + 48, ListTop + 90, summary.build, White, Panel, 52);
         c.Print(Left + 48, ListTop + 176, "ULTIMO STATUS", Accent, Panel);
-        c.Print(Left + 48, ListTop + 224, summary.status, White, Panel, 63);
+        c.Print(Left + 48, ListTop + 224, summary.status, White, Panel, 52);
         c.Print(Left + 48, ListTop + 310, "FASTMEM", Accent, Panel);
-        c.Print(Left + 48, ListTop + 358, summary.fastmem, White, Panel, 63);
-        c.Print(Left + 48, ListTop + 470, "Dados historicos, nao atualizados ao vivo.", Muted, Panel);
+        c.Print(Left + 48, ListTop + 358, summary.fastmem, White, Panel, 52);
+        c.Print(Left + 48, ListTop + 470, "Historico: boot.old.log (sessao anterior).", Muted, Panel);
         c.Print(Left + 48, ListTop + 526, "Circulo: voltar para biblioteca", Muted, Panel);
     } else {
         for (int row = 0; row < Rows && first + row < count; ++row) {
@@ -260,7 +268,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     constexpr int SideX = 1290;
     c.Fill(SideX, ListTop - 12, 510, 650, Panel);
     c.Fill(SideX + 24, ListTop + 20, 6, 54, Accent);
-    c.Print(SideX + 52, ListTop + 24, "GD TEST 31", White, Panel);
+    c.Print(SideX + 52, ListTop + 24, "GD TEST 33", White, Panel);
     c.Print(SideX + 26, ListTop + 110, "MODO SEGURO", Accent, Panel);
     c.Print(SideX + 26, ListTop + 160, fastmemOn ? "Fastmem: ON (experimental)" : "Fastmem: OFF (padrao)", White, Panel);
     c.Print(SideX + 26, ListTop + 212, "Quadrado: configuracoes", Muted, Panel);
