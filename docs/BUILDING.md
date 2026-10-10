@@ -1,10 +1,32 @@
 # Building from source
 
-Everything was built on **Windows 11 with Git Bash**. It has only ever been built on one machine, and
-the scripts use that machine's absolute paths. Expect to adjust things; this page lists every piece
-and how it was made, so the build can be reproduced.
+The original upstream experiment was built on **Windows 11 with Git Bash** and several scripts used
+machine-specific paths. The `dev/fastmem-v1` continuation has now also been built end-to-end on
+**Linux Mint**: SDK bootstrap, libc++18, OpenSSL, FFmpeg, Eden, ELF linking and PS4 PKG packaging all
+completed successfully on 2026-10-07.
 
-## 0. Paths
+For the exact Test 30 bring-up history, errors fixed, artifact names and console test plan, see
+[`docs/GD-TEST30.md`](GD-TEST30.md).
+
+### Linux quick path
+
+```bash
+bash scripts/bootstrap-linux.sh
+bash scripts/bootstrap-cmake-linux.sh
+bash scripts/fetch-eden.sh
+bash scripts/build-deps-linux.sh
+
+rm -rf build-eden
+bash configure-eden.sh
+cmake --build build-eden --target eden-ps4 -j"$(nproc)"
+
+bash package-eden.sh
+```
+
+The dependency build is resumable and skips already completed libc++18, OpenSSL and FFmpeg outputs.
+The Linux path uses a repo-local CMake 3.31.12 so the host CMake package does not need to be replaced.
+
+## 0. Original Windows paths
 
 The scripts and toolchain files hard-code two roots from the original machine:
 
@@ -114,6 +136,12 @@ Notes:
 ```bash
 bash package-eden.sh   # -> out-eden/IV0000-EDPS00001_00-EDENPS4000000000.pkg, ELF copy in elf/
 ```
+
+On Linux, `package-eden.sh` uses `sdk/bin/linux/create-fself` plus the bundle's
+`orbis-compat/scripts/ps4/make-pkg.sh`. The SDK bundle intentionally prunes OpenOrbis sample
+modules, so the script fetches exactly `libc.prx`, `libSceFios2.prx` and `right.sprx` from the
+OpenOrbis `v0.5.4` tag and verifies their Git blob IDs before use. No game, key or firmware files
+are downloaded.
 
 The package is laid out and signed like OpenOrbis's own samples (paid `0x3800000000000011`, default
 authinfo, `sce_module/libc.prx` + `libSceFios2.prx`, `sce_sys/about/right.sprx`, SFO category `gd`).

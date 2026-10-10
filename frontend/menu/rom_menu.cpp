@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -105,6 +107,86 @@ struct Canvas {
     }
 };
 
+// Read the persisted fastmem mode (default OFF) without initializing Eden.
+bool ReadFastmemSetting() {
+    std::ifstream in{"/data/edenps4/settings.txt"};
+    std::string line;
+    bool on = false;
+    while (std::getline(in, line)) {
+        const auto comment = line.find('#');
+        if (comment != std::string::npos) line.erase(comment);
+        line.erase(std::remove_if(line.begin(), line.end(),
+            [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r'; }), line.end());
+        if (line == "fastmem=on") on = true;
+        if (line == "fastmem=off") on = false;
+    }
+    return on;
+}
+
+// Save atomically, retaining unrelated settings (including custom driver options).
+bool WriteFastmemSetting(bool on) {
+    namespace fs = std::filesystem;
+    const fs::path path{"/data/edenps4/settings.txt"};
+    const fs::path temporary{"/data/edenps4/settings.txt.tmp"};
+    std::vector<std::string> lines;
+    {
+        std::ifstream input{path};
+        for (std::string line; std::getline(input, line);) {
+            std::string check = line;
+            const auto comment = check.find('#');
+            if (comment != std::string::npos) check.erase(comment);
+            check.erase(std::remove_if(check.begin(), check.end(),
+                [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r'; }), check.end());
+            if (check.rfind("fastmem=", 0) != 0) lines.push_back(line);
+        }
+    }
+    std::ofstream out{temporary, std::ios::trunc};
+    if (!out) return false;
+    for (const auto& line : lines) out << line << '\n';
+    out << "fastmem=" << (on ? "on" : "off") << '\n';
+    out.flush();
+    if (!out.good()) { out.close(); std::error_code ec; fs::remove(temporary, ec); return false; }
+    out.close();
+    std::error_code ec;
+    fs::rename(temporary, path, ec);
+    if (ec) { fs::remove(temporary, ec); return false; }
+    Ps4::Log("menu: persisted fastmem=%s (effective next launch)", on ? "on" : "off");
+    return true;
+}
+
+struct BootSummary {
+    std::string build = "Nenhuma sessao anterior";
+    std::string status = "Sem FPS anterior";
+    std::string fastmem = "Sem dado anterior";
+};
+BootSummary ReadBootSummary() {
+    BootSummary summary;
+    // OpenBootLog() already rotates boot.log to boot.old.log at launch.
+    // The current boot has no game FPS until AFTER this native menu exits.
+    std::ifstream in{"/data/edenps4/boot.old.log"};
+    std::string line;
+    std::size_t count = 0;
+    // Bounded historical read; no live polling and no changes to log rotation.
+    while (count++ < 20000 && std::getline(in, line)) {
+        if (line.size() > 1024) continue;
+        if (const auto pos = line.find("PS4 build:"); pos != std::string::npos) {
+            const auto first = pos + std::strlen("PS4 build:");
+            const auto last = line.find(';', first);
+            summary.build = line.substr(first, std::min(last == std::string::npos ? line.size() - first : last - first, size_t(64)));
+        }
+        if (const auto pos = line.find("status: game "); pos != std::string::npos) {
+            const auto last = line.find(", guest+tables", pos);
+            summary.status = line.substr(pos + 8, std::min(last == std::string::npos ? line.size() - pos - 8 : last - pos - 8, size_t(90)));
+        }
+        for (const char* marker : {"fastmem: view ", "fastmem: off "}) {
+            if (const auto pos = line.find(marker); pos != std::string::npos) {
+                summary.fastmem = line.substr(pos, 90);
+            }
+        }
+    }
+    return summary;
+}
+
 std::string DisplayName(const std::string& file) {
     std::string name = file;
     if (const auto dot = name.find_last_of('.'); dot != std::string::npos && dot > 0) {
@@ -113,40 +195,144 @@ std::string DisplayName(const std::string& file) {
     return name;
 }
 
-void Draw(Canvas& c, const std::vector<std::string>& names, int selected) {
-    constexpr int Left = 120;
-    constexpr int RowHeight = 56;
-    constexpr int ListTop = 220;
-    constexpr int Rows = 13;
-    constexpr size_t MaxChars = (Width - 2 * Left - 40) / MenuFont::Width;
-    c.Fill(0, 0, Width, Height, Background);
-    c.Print(Left, 90, "Eden PS4 - elegi un juego", Text, Background);
-    c.Fill(Left, 150, Width - 2 * Left, 3, Dim);
+// GD Test 35: dashboard drawn entirely on the existing two video-out buffers.
+// Solid surfaces keep text alpha blending deterministic; no GPU or network dependencies.
+enum class MenuView { Home, Library, Settings, Diagnostics };
+constexpr uint32_t Ink = 0xFF091427;
+constexpr uint32_t Surface = 0xFF142943;
+constexpr uint32_t Surface2 = 0xFF1D3652;
+constexpr uint32_t Orange = 0xFFFF6B00;
+constexpr uint32_t White = 0xFFF6F8FF;
+constexpr uint32_t Soft = 0xFFBBCBDE;
+constexpr uint32_t Green = 0xFF6FD6AA;
+constexpr int L = 96;
 
+std::string Fitted(const std::string& str, size_t max) {
+    return str.size() <= max ? str : str.substr(0, max > 3 ? max - 3 : 0) + "...";
+}
+std::string GameLabel(const std::string& filename) {
+    if (filename.find("gd-probe") != std::string::npos || filename.find("GD Probe") != std::string::npos)
+        return "GD PROBE  /  DIAGNOSTICO";
+    if (filename.find("hbmenu") != std::string::npos || filename.find("Homebrew Menu") != std::string::npos)
+        return "HOMEBREW MENU  /  EXPERIMENTAL";
+    return DisplayName(filename);
+}
+void Frame(Canvas& c, MenuView view, bool fastmemOn) {
+    c.Fill(0, 0, Width, Height, Ink);
+    c.Fill(0, 0, Width, 12, Orange);
+    c.Fill(L, 58, 76, 76, Orange);
+    c.Print(L + 23, 86, "GD", White, Orange);
+    c.Print(L + 108, 54, "NX ON ORBIS", White, Ink);
+    c.Print(L + 108, 94, "GD EDITION  /  TEST 36", Soft, Ink);
+    c.Fill(Width - 470, 71, 374, 52, Surface);
+    c.Fill(Width - 470, 71, 7, 52, fastmemOn ? Orange : Green);
+    c.Print(Width - 442, 88, fastmemOn ? "FASTMEM EXPERIMENTAL" : "FASTMEM MODO SEGURO", White, Surface, 23);
+    c.Fill(L, 160, Width - L * 2, 2, 0xFF304660);
+    const char* tabs[] = {"HOME", "BIBLIOTECA", "CONFIGURACOES", "DIAGNOSTICOS"};
+    for (int i = 0; i < 4; ++i) {
+        const bool active = int(view) == i;
+        const int x = L + i * 302;
+        c.Fill(x, 189, 278, 55, active ? Surface2 : Ink);
+        if (active) c.Fill(x, 239, 278, 5, Orange);
+        c.Print(x + 18, 207, tabs[i], active ? White : Soft, active ? Surface2 : Ink);
+    }
+}
+void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool fastmemOn,
+          MenuView view, bool saveError, const BootSummary& summary) {
+    Frame(c, view, fastmemOn);
     const int count = int(names.size());
-    const int first = std::clamp(selected - Rows / 2, 0, std::max(count - Rows, 0));
-    for (int row = 0; row < Rows && first + row < count; ++row) {
-        const int index = first + row;
-        const int y = ListTop + row * RowHeight;
-        const bool on = index == selected;
-        if (on) {
-            c.Fill(Left, y - 8, Width - 2 * Left, RowHeight - 4, Highlight);
+    if (view == MenuView::Home) {
+        c.Print(L, 290, "BEM-VINDO A SUA BIBLIOTECA", White, Ink);
+        c.Print(L, 333, "Emulacao experimental de Nintendo Switch no PlayStation 4", Soft, Ink, 66);
+        // Large hero panel: selected app can be launched directly with Cross.
+        c.Fill(L, 385, 1120, 410, Surface);
+        c.Fill(L, 385, 13, 410, Orange);
+        c.Fill(L + 40, 422, 214, 208, Surface2);
+        c.Fill(L + 62, 444, 170, 165, Orange);
+        c.Print(L + 91, 507, "NX", White, Orange);
+        c.Print(L + 292, 417, "DESTAQUE", Orange, Surface);
+        c.Print(L + 292, 469, Fitted(GameLabel(names[selected]), 36), White, Surface, 38);
+        c.Print(L + 292, 527, "Pronto para iniciar", Green, Surface);
+        c.Print(L + 292, 590, "X  INICIAR APLICATIVO", White, Surface);
+        c.Print(L + 292, 654, "Direcional: escolher aplicativo", Soft, Surface);
+        c.Print(L + 292, 696, "Direita: biblioteca completa", Soft, Surface);
+        c.Fill(L + 32, 748, 1055, 2, 0xFF36516D);
+
+        c.Fill(1250, 385, 574, 410, Surface);
+        c.Print(1284, 417, "ULTIMA SESSAO", Orange, Surface);
+        c.Print(1284, 475, "DESEMPENHO REGISTRADO", Soft, Surface);
+        c.Print(1284, 518, Fitted(summary.status, 28), White, Surface, 30);
+        c.Print(1284, 594, "MEMORIA RAPIDA", Soft, Surface);
+        c.Print(1284, 637, fastmemOn ? "ON - TESTE" : "OFF - SEGURO", fastmemOn ? Orange : Green, Surface);
+        c.Print(1284, 705, "Triangulo: detalhes", Soft, Surface);
+
+        c.Fill(L, 825, 548, 100, Surface2);
+        c.Print(L + 24, 843, "BIBLIOTECA", White, Surface2);
+        char apps[64]; std::snprintf(apps, sizeof(apps), "%d aplicativos disponiveis", count);
+        c.Print(L + 24, 882, apps, Soft, Surface2);
+        c.Fill(L + 574, 825, 546, 100, Surface2);
+        c.Print(L + 600, 843, "CONFIGURACOES", White, Surface2);
+        c.Print(L + 600, 882, "Quadrado: ajustes de CPU", Soft, Surface2);
+        c.Fill(1250, 825, 574, 100, Surface2);
+        c.Print(1278, 843, "DIAGNOSTICOS", White, Surface2);
+        c.Print(1278, 882, "Historico de execucao", Soft, Surface2);
+    } else if (view == MenuView::Library) {
+        c.Print(L, 288, "SEUS APLICATIVOS", White, Ink);
+        c.Print(L, 330, "Escolha um item para iniciar no emulador", Soft, Ink);
+        c.Fill(L, 380, 1210, 553, Surface);
+        constexpr int rows = 7, itemH = 71;
+        const int first = std::clamp(selected - rows / 2, 0, std::max(count - rows, 0));
+        for (int i = 0; i < rows && i + first < count; ++i) {
+            const int y = 400 + i * itemH;
+            const bool chosen = selected == i + first;
+            const uint32_t bg = chosen ? Surface2 : Surface;
+            c.Fill(L + 16, y, 1170, 63, bg);
+            if (chosen) c.Fill(L + 16, y, 8, 63, Orange);
+            c.Print(L + 45, y + 22, Fitted(GameLabel(names[first + i]), 49),
+                    chosen ? White : Soft, bg, 50);
         }
-        c.Print(Left + 20, y, DisplayName(names[index]), on ? 0xFFFFFFFF : Text,
-                on ? Highlight : Background, MaxChars);
+        c.Fill(1340, 380, 484, 553, Surface);
+        c.Print(1370, 414, "APLICATIVO", Orange, Surface);
+        c.Print(1370, 468, Fitted(GameLabel(names[selected]), 23), White, Surface, 23);
+        c.Print(1370, 540, "X  INICIAR", Green, Surface);
+        c.Print(1370, 625, "Selecione com cima/baixo", Soft, Surface);
+        c.Print(1370, 700, "Voltar: Circulo", Soft, Surface);
+    } else if (view == MenuView::Settings) {
+        c.Print(L, 287, "CONFIGURACOES DO EMULADOR", White, Ink);
+        c.Print(L, 335, "As alteracoes passam a valer no proximo boot", Soft, Ink);
+        c.Fill(L, 393, 1160, 520, Surface);
+        c.Fill(L + 30, 427, 8, 92, Orange);
+        c.Print(L + 66, 429, "FASTMEM", White, Surface);
+        c.Print(L + 66, 483, fastmemOn ? "ATIVADA / EXPERIMENTAL" : "DESATIVADA / RECOMENDADA",
+                fastmemOn ? Orange : Green, Surface);
+        c.Print(L + 64, 579, "X  Alternar   |   Circulo  Voltar", Soft, Surface);
+        c.Print(L + 64, 653, "GD 30: ON ~23 FPS, OFF ~60 FPS (hbmenu)", Soft, Surface);
+        if (saveError) c.Print(L + 64, 724, "ERRO AO SALVAR settings.txt", Orange, Surface);
+        c.Fill(1290, 393, 534, 520, Surface);
+        c.Print(1320, 431, "PERFIL DE EXECUCAO", Orange, Surface);
+        c.Print(1320, 507, "Fastmem OFF por padrao", White, Surface);
+        c.Print(1320, 576, "PS4 Fat - modo seguro", Soft, Surface);
+        c.Print(1320, 660, "Config: settings.txt", Soft, Surface);
+    } else {
+        c.Print(L, 289, "CENTRAL DE DIAGNOSTICOS", White, Ink);
+        c.Print(L, 332, "Resultados da sessao anterior - nao sao dados ao vivo", Soft, Ink, 64);
+        c.Fill(L, 390, 1728, 532, Surface);
+        c.Fill(L + 32, 430, 8, 81, Orange);
+        c.Print(L + 69, 427, "BUILD ANTERIOR", Orange, Surface);
+        c.Print(L + 69, 487, Fitted(summary.build, 63), White, Surface, 65);
+        c.Fill(L + 44, 565, 1610, 2, 0xFF304660);
+        c.Print(L + 69, 600, "DESEMPENHO REPORTADO", Orange, Surface);
+        c.Print(L + 69, 653, Fitted(summary.status, 65), White, Surface, 65);
+        c.Print(L + 69, 735, "FASTMEM / SESSAO ANTERIOR", Orange, Surface);
+        c.Print(L + 69, 788, Fitted(summary.fastmem, 65), White, Surface, 65);
+        c.Print(L + 69, 856, "Fonte: boot.old.log", Soft, Surface);
     }
-    if (first > 0) {
-        c.Print(Width - Left - MenuFont::Width, ListTop - 50, "^", Dim, Background);
-    }
-    if (first + Rows < count) {
-        c.Print(Width - Left - MenuFont::Width, ListTop + Rows * RowHeight, "v", Dim, Background);
-    }
-    c.Fill(Left, Height - 130, Width - 2 * Left, 3, Dim);
-    c.Print(Left, Height - 100, "Arriba/Abajo: elegir    X: jugar", Dim, Background);
-    char position[32];
-    std::snprintf(position, sizeof(position), "%d / %d", selected + 1, count);
-    c.Print(Width - Left - int(std::strlen(position)) * MenuFont::Width, Height - 100, position,
-            Dim, Background);
+    c.Fill(L, 971, Width - L * 2, 2, 0xFF304660);
+    const char* footer = view == MenuView::Settings ? "X ALTERNAR     O VOLTAR     TRI DIAGNOSTICOS" :
+                         view == MenuView::Diagnostics ? "O VOLTAR     QUADRADO CONFIGURACOES" :
+                         "X INICIAR     SETAS NAVEGAR     QUADRADO AJUSTES     TRI LOGS";
+    c.Print(L + 4, 1003, footer, Soft, Ink, 74);
+    c.Print(1595, 1003, "GD 36  /  BETA", Orange, Ink, 17);
 }
 
 } // Anonymous namespace
@@ -191,13 +377,17 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
     Ps4::Log("menu: %zu games listed", names.size());
 
     int selected = std::clamp(initial, 0, int(names.size()) - 1);
+    bool fastmemOn = ReadFastmemSetting();
+    MenuView view = MenuView::Home;
+    BootSummary summary = ReadBootSummary();
+    bool saveError = false;
     int back = 0;
     const auto present = [&] {
         while (sceVideoOutIsFlipPending(handle) > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         Canvas canvas{static_cast<uint32_t*>(buffers[back])};
-        Draw(canvas, names, selected);
+        Draw(canvas, names, selected, fastmemOn, view, saveError, summary);
         sceVideoOutSubmitFlip(handle, back, FlipVsync, 0);
         back ^= 1;
     };
@@ -215,8 +405,49 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
         }
         const std::uint32_t pressed = now & ~previous;
         previous = now;
+        if (pressed & Ps4::Button::Triangle) {
+            view = view == MenuView::Diagnostics ? MenuView::Home : MenuView::Diagnostics;
+            if (view == MenuView::Diagnostics) summary = ReadBootSummary();
+            present();
+            continue;
+        }
+        if (pressed & Ps4::Button::Square) {
+            view = view == MenuView::Settings ? MenuView::Home : MenuView::Settings;
+            saveError = false;
+            present();
+            continue;
+        }
+        if (pressed & Ps4::Button::Circle) {
+            if (view != MenuView::Home) {
+                view = MenuView::Home;
+                present();
+            }
+            continue;
+        }
         if (pressed & Ps4::Button::Cross) {
+            if (view == MenuView::Settings) {
+                const bool desired = !fastmemOn;
+                saveError = !WriteFastmemSetting(desired);
+                if (!saveError) fastmemOn = desired;
+                present();
+                continue;
+            }
+            if (view == MenuView::Diagnostics) continue;
             break;
+        }
+        if (view == MenuView::Settings || view == MenuView::Diagnostics) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            continue;
+        }
+        if (pressed & Ps4::Button::Right) {
+            view = MenuView::Library;
+            present();
+            continue;
+        }
+        if (pressed & Ps4::Button::Left) {
+            view = MenuView::Home;
+            present();
+            continue;
         }
         int step = 0;
         const std::uint32_t vertical = now & (Ps4::Button::Up | Ps4::Button::Down);

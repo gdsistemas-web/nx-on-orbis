@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: GD Sistemas <dev@gdsistemas.local>
+Date: Wed, 7 Oct 2026 22:45:00 -0300
+Subject: [PATCH] libcxx: avoid socket sendfile for Orbis copy_file
+
+OpenOrbis exposes the BSD/FreeBSD sendfile API, whose destination is a
+socket and whose signature is incompatible with libc++'s Linux-style
+file-to-file copy implementation.
+
+Use libc++'s fstream fallback for std::filesystem::copy_file on Orbis.
+---
+ libcxx/src/filesystem/operations.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libcxx/src/filesystem/operations.cpp b/libcxx/src/filesystem/operations.cpp
+index 0000000..0000000 100644
+--- a/libcxx/src/filesystem/operations.cpp
++++ b/libcxx/src/filesystem/operations.cpp
+@@ -32,7 +32,7 @@
+ #include <fcntl.h> /* values for fchmodat */
+ #include <time.h>
+ 
+-#if __has_include(<sys/sendfile.h>)
++#if !defined(__ORBIS__) && __has_include(<sys/sendfile.h>)
+ #  include <sys/sendfile.h>
+ #  define _LIBCPP_FILESYSTEM_USE_SENDFILE
+ #elif defined(__APPLE__) || __has_include(<copyfile.h>)
+-- 
+2.43.0
