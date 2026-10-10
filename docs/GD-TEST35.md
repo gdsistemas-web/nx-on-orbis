@@ -70,3 +70,17 @@ Capturas de tela enviadas pelo testador mostram:
 - GD Probe 0.1 iniciou, exibiu checksum de CPU `ba34abe5f2510398`, `Memory 1 MiB: PASS`, contagem de apresentação e eventos de botões (last input UP).
 
 Os 38.2 FPS são históricos da execução da GD34, não uma medida da home GD35. Não comparar diretamente com ~60 FPS do hbmenu (cargas distintas). Ainda pendente: log de runtime da GD35, validação do encerramento específico desta versão e testes de jogos comerciais.
+
+## Validacao adicional — boot.log GD35 no PS4 Fat
+
+O testador confirmou pelo log:
+
+- `gd-test35-20261010T023255Z-0498b1e860c4`.
+- `menu choice 1 of 2: /app0/assets/misc/gd-probe.nro` aos 76.108 s.
+- `fastmem: off (settings)`.
+- Status de jogo: 16.7 FPS (~87 s), 35.9 FPS (~97 s) e 38.2 FPS (~107 s), sempre speed reportada 100%; ultimo frame 26.2 ms.
+- Guest + tabelas: 65 MiB; maior bloco direto livre: 1982 MiB.
+- `the game exited` aos 115.932 s, seguido de `finished: close the app with the PS button` aos 115.939 s.
+- Nenhum crash encontrado no trecho filtrado apresentado.
+
+Comparacao: o GD Probe tambem reportou 38.2 FPS na GD34. Portanto, este teste nao evidencia regressao nesta carga; isso nao equivale a benchmark de jogos comerciais ou do desempenho da home.
