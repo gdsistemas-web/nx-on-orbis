@@ -67,3 +67,17 @@ Verificar no empacotamento a mensagem `including built-in GD Probe`. O PKG foi c
 1. Registrar o log completo do GD36 após gráficos e retorno ao texto, com fase/encerramento, `status:` e eventuais falhas.
 2. Criar probe de calibração com amostras R/G/B/W, verificando se troca R/B é consistente em áreas preenchidas e framebuffer.
 3. Manter GD35 e GD36 como referências de estabilidade. Não inferir compatibilidade com jogos comerciais.
+
+## Validacao do boot.log — GD36 no PS4 Fat
+
+Trecho enviado pelo testador confirma:
+
+- Build `gd-test36-20261010T024356Z-0498b1e860c4`; `gd-probe.nro` iniciado aos 96.999 s, fastmem OFF.
+- Watchdog relatou `no new frame for 15 s during running` aos 98.252 s, mas novos quadros apareceram e a execução prosseguiu; investigar fase/instrumentação antes de assumir hang real.
+- Status aos 108/118/128 s: 16.5, 35.6, 38.1 FPS; frame 30.2, 26.3, 26.3 ms.
+- Status aos 138/148/158/168 s: 29.1, 19.2, 18.2, 19.5 FPS; frame 49.4, 54.7, 54.9, 48.0 ms.
+- A queda coincide aproximadamente com testes gráficos descritos, mas `boot.log` não identifica o instante exato da troca entre console e framebuffer. **Não concluir causalidade exclusiva ou comparar cargas distintas como benchmark.**
+- Memória guest+tabelas: 68-70 MiB; maior bloco livre direto 1978-1979 MiB. Lazy peak final: 69 MiB (métrica distinta do total de RAM).
+- `the game exited` aos 177.479 s e `finished: close the app with the PS button` aos 177.485 s. Encerramento pelo guest confirmado.
+
+Recomendacao GD37: medir as transições de modo, isolar custo de clear/full-frame CPU vs apresentação, testar formatos/canais de cor em imagens de referência e usar versões com área suja para comparar. Preservar fastmem OFF.
