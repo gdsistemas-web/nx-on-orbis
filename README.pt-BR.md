@@ -2,7 +2,7 @@
 
 [English](README.md) | **Português (Brasil)**
 
-> **Esta é a branch de continuação `dev/fastmem-v1`.** Ela é baseada na `experimental-fastmem` (testes 25–29) e adiciona o **GD Test 30**, com diagnóstico de hotspots de fastmem e um fluxo reproduzível de build/empacotamento no Linux. O PKG do Test 30 já compila e empacota com sucesso no Linux; a validação no console ainda está pendente. Veja [docs/GD-TEST30.md](docs/GD-TEST30.md).
+> **GD Edition — desenvolvimento temporariamente em pausa.** A branch principal reúne o trabalho até a **GD Test 36**, testada no **PS4 Fat com GoldHEN**: home nativa, GD Probe 0.2, testes de CPU/memória/controle e gráficos coloridos animados. A renderização gráfica ainda tem canais de cor incorretos e desempenho experimental; **não há validação de jogos comerciais nesta continuação**. Retomada: [docs/GD-TEST36.md](docs/GD-TEST36.md). O repositório permanece aberto.
 
 Um port experimental do emulador de Nintendo Switch **Eden** (um fork do yuzu) para um
 **PS4 Pro desbloqueado** (toolchain OpenOrbis, driver Vulkan Mesa RADV para a GPU do PS4).
@@ -15,7 +15,7 @@ Um port experimental do emulador de Nintendo Switch **Eden** (um fork do yuzu) p
 | Base | Eden `5f142c79` (commit fixado pelo port de PS5 ProsperoEden) + patches locais em `patches/eden/` |
 | Toolchain | OpenOrbis 0.5.4 + [orbis-sdk-v1](https://github.com/orbis-ports/orbis-porting-kit/releases/tag/orbis-sdk-v1) (orbis-compat, Mesa RADV para “Liverpool” GFX7), LLVM 18 e libc++ 18 compilada para PS4 |
 | Release estável anterior | [v0.1.0](../../releases/tag/v0.1.0): `.pkg` + ELF exato para simbolização de crashes |
-| Teste atual | [v0.2.0-test30](../../releases/tag/v0.2.0-test30): build e PKG Linux concluídos; validação no PS4 pendente |
+| Teste mais recente | **GD Test 36**: PKG compilado e GD Probe 0.2 validado no PS4 Fat (fonte em `main`); testes gráficos ainda experimentais. [Registro técnico](docs/GD-TEST36.md) |
 | Licença | GPL-3.0-or-later (veja `LICENSE` e `NOTICE.md`) |
 
 ## Sem afiliação com o Eden. Desenvolvido com apoio de IA.
