@@ -1,0 +1,51 @@
+# GD Test 36 — GD Probe 0.2 (experimental)
+
+## Baseline validado
+
+GD Test 35 foi testada no PS4 Fat: home, biblioteca, configurações, diagnósticos e GD Probe 0.1 abriram. No GD Probe, o log registrou 38,2 FPS, velocidade de emulação de 100%, 26,2 ms/quadro, fastmem OFF, 65 MiB de memória lazy comprometida e encerramento confirmado por `the game exited`. Esses números são do teste da GD35, não benchmarks de jogos comerciais.
+
+## Novidades
+
+- Branch `dev/gd-test36`, novo Title ID `EDPS00036`, build ID `gd-test36`.
+- Preserva a home/dashboard, o leitor de `boot.old.log`, fastmem desligada por padrão e o layout visual GD.
+- `switch-probe/source/main.c` agora implementa **GD Probe 0.2** com tela texto segura e modo gráfico 1280 × 720 RGBA8888, quatro cores e animação de quadrado.
+- A rotina de CPU e os testes de memória de 1 MiB e 4 MiB são executados ao iniciar.
+- Contador de loops e taxa calculada a cada segundo via relógio monotônico. **Essa taxa não é FPS da GPU ou do emulador**; comparar com o `status: game` do boot.log.
+- A entra no modo gráfico; B retorna ao modo texto. Direcionais esquerda/direita ajustam a velocidade da animação. +/Options encerra o NRO; o frontend PS4 continua aguardando fechamento com PS.
+- Usa API de framebuffer do libnx baseada no exemplo oficial `switchbrew/switch-examples/graphics/simplegfx`.
+- Se `framebufferCreate` falhar, volta ao console e exibe a falha.
+
+**Risco experimental:** a alternância entre console e framebuffer depende da implementação HLE de display do Eden e ainda não foi validada. Começar pelo teste texto. Se a tela ficar preta ou travar ao pressionar A, fechar o aplicativo pelo botão PS, recuperar o log e manter GD35 como fallback. O NRO não é prova de compatibilidade com jogos comerciais.
+
+## Build no Linux Mint
+
+```bash
+cd ~/nx-on-orbis
+git status --short
+git fetch origin
+git switch -c dev/gd-test36 --track origin/dev/gd-test36
+export DEVKITPRO=/opt/devkitpro
+export DEVKITA64=$DEVKITPRO/devkitA64
+export PATH=$DEVKITA64/bin:$DEVKITPRO/tools/bin:$PATH
+make -C switch-probe clean
+make -C switch-probe
+source tools/env-build.sh
+unset OO_PS4_TOOLCHAIN
+bash configure-eden.sh
+cmake --build build-eden --target eden-ps4 -j4
+grep -aEom3 'gd-test36|GD EDITION  /  TEST 36' build-eden/bin/eden-ps4
+bash package-eden.sh
+ls -lh out-eden/*EDPS00036*.pkg
+```
+
+Verificar no empacotamento a mensagem `including built-in GD Probe`. O PKG ainda depende de compilação e teste no PS4 Fat. Preservar os ELFs.
+
+## Roteiro de testes
+
+1. Instalar GD36 separadamente, sem remover GD35.
+2. Conferir home e configurações.
+3. Abrir GD Probe 0.2 e confirmar checksum, Memory 1 MiB PASS e Memory 4 MiB PASS.
+4. Apertar A (círculo no mapeamento de Switch do frontend) para modo gráfico. Conferir quatro faixas coloridas e um quadrado em movimento.
+5. Direcional esquerda/direita varia a velocidade; B (X físico, no layout mapeado) retorna ao texto.
+6. Options/+ encerra; aguardar confirmação `the game exited` e `finished` no `boot.log`.
+7. Comparar log completo sem confundir taxa do loop com FPS renderizados.
