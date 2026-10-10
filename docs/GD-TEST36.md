@@ -38,7 +38,7 @@ bash package-eden.sh
 ls -lh out-eden/*EDPS00036*.pkg
 ```
 
-Verificar no empacotamento a mensagem `including built-in GD Probe`. O PKG ainda depende de compilação e teste no PS4 Fat. Preservar os ELFs.
+Verificar no empacotamento a mensagem `including built-in GD Probe`. O PKG foi compilado pelo testador no Linux Mint, gerando `IV0000-EDPS00036_00-EDENPS4000000000.pkg` (~58 MB) e ELF `eden-ps4-gd-test36-20261009-2344.elf` (~70 MB). O teste de imagens no PS4 Fat ocorreu depois; preservar os ELFs.
 
 ## Roteiro de testes
 
@@ -49,3 +49,21 @@ Verificar no empacotamento a mensagem `including built-in GD Probe`. O PKG ainda
 5. Direcional esquerda/direita varia a velocidade; B (X físico, no layout mapeado) retorna ao texto.
 6. Options/+ encerra; aguardar confirmação `the game exited` e `finished` no `boot.log`.
 7. Comparar log completo sem confundir taxa do loop com FPS renderizados.
+
+
+## Resultado de hardware — PS4 Fat (capturas fornecidas pelo testador)
+
+- GD Probe 0.2 inicia e renderiza tela texto.
+- CPU checksum mostrado: `ba34abe5f2510398`, correspondente à rotina determinística de verificação.
+- Testes de memória de 1 MiB e 4 MiB exibem `PASS`.
+- Taxa de loop exibida ~38,5/s; não representa FPS do emulador nem FPS da GPU.
+- Botão A entrou no modo framebuffer: quatro retângulos, barra e quadrado renderizados. Posições do quadrado mudaram entre duas capturas, compatíveis com animação funcional.
+- Botão B voltou à tela texto. Eventos de controles e velocidade foram incrementados.
+- **Problema de cores ainda aberto**: laranja definido como `RGBA8_MAXALPHA(255,107,0)` aparece azulado; azul `RGBA8_MAXALPHA(36,154,245)` aparece amarelado nas fotografias. Investigar ordem dos canais no caminho RGBA8888 (possível troca R/B); confirmar com padrão de cores calibrado e screenshots sem correção automática antes de alterar o renderizador ou aplicar swizzle permanente.
+- A ausência de travamento aparente nas fotos não comprova encerramento: recuperar `boot.log` e conferir `the game exited` e ausência de faults.
+
+## Próxima investigação
+
+1. Registrar o log completo do GD36 após gráficos e retorno ao texto, com fase/encerramento, `status:` e eventuais falhas.
+2. Criar probe de calibração com amostras R/G/B/W, verificando se troca R/B é consistente em áreas preenchidas e framebuffer.
+3. Manter GD35 e GD36 como referências de estabilidade. Não inferir compatibilidade com jogos comerciais.
