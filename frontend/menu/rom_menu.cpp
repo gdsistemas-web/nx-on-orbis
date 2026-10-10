@@ -216,7 +216,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     c.Fill(Left, 78, 70, 70, Accent);
     c.Print(Left + 20, 102, "GD", White, Accent);
     c.Print(Left + 100, 84, "NX ON ORBIS", White, Base);
-    c.Print(Left + 100, 124, "GD EDITION  /  TEST 33", Muted, Base);
+    c.Print(Left + 100, 124, "GD EDITION  /  TEST 34", Muted, Base);
     c.Fill(Left, 183, Width - Left * 2, 2, 0xFF2B3750);
 
     c.Print(Left, 216, settingsOpen ? "CONFIGURACOES" : diagnosticsOpen ? "DIAGNOSTICOS" : "BIBLIOTECA", White, Base);
@@ -268,7 +268,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     constexpr int SideX = 1290;
     c.Fill(SideX, ListTop - 12, 510, 650, Panel);
     c.Fill(SideX + 24, ListTop + 20, 6, 54, Accent);
-    c.Print(SideX + 52, ListTop + 24, "GD TEST 33", White, Panel);
+    c.Print(SideX + 52, ListTop + 24, "GD TEST 34", White, Panel);
     c.Print(SideX + 26, ListTop + 110, "MODO SEGURO", Accent, Panel);
     c.Print(SideX + 26, ListTop + 160, fastmemOn ? "Fastmem: ON (experimental)" : "Fastmem: OFF (padrao)", White, Panel);
     c.Print(SideX + 26, ListTop + 212, "Quadrado: configuracoes", Muted, Panel);

@@ -126,6 +126,16 @@ std::string FindGame() {
         }
     }
     std::sort(games.begin(), games.end());
+    // Built-in probe is the default choice when available; it does not invoke hbloader.
+    // Keep hbmenu as a fallback and comparison test, including when user ROMs exist.
+    const fs::path bundled_probe{"/app0/assets/misc/gd-probe.nro"};
+    const fs::path bundled_hbmenu{"/app0/assets/misc/hbmenu.nro"};
+    if (fs::is_regular_file(bundled_probe, ec)) {
+        games.insert(games.begin(), bundled_probe);
+    }
+    if (fs::is_regular_file(bundled_hbmenu, ec)) {
+        games.push_back(bundled_hbmenu);
+    }
     if (!games.empty()) {
         // The last game played is preselected in the menu (menu/rom_menu.cpp).
         const fs::path last_file = data / "last_game.txt";
@@ -141,7 +151,13 @@ std::string FindGame() {
         }
         std::vector<std::string> names;
         for (const auto& game : games) {
-            names.push_back(game.filename().string());
+            if (game == bundled_probe) {
+                names.emplace_back("GD Probe - CPU MEM PAD.nro");
+            } else if (game == bundled_hbmenu) {
+                names.emplace_back("Homebrew Menu (requires hbloader).nro");
+            } else {
+                names.push_back(game.filename().string());
+            }
         }
         Ps4::SetPadLight(255, 255, 255);
         // nomenu.txt skips the menu (in case Eden cannot open the display after it).
@@ -152,19 +168,8 @@ std::string FindGame() {
         if (std::ofstream out{last_file}; out) {
             out << games[index].filename().string() << '\n';
         }
-        Ps4::Log("game %zu of %zu in roms/", index + 1, games.size());
+        Ps4::Log("menu choice %zu of %zu: %s", index + 1, games.size(), games[index].string().c_str());
         return games[index].string();
-    }
-    // Nothing of the user's: the Homebrew Menu (switchbrew/nx-hbmenu, ISC) that ships in the
-    // package, which needs no keys or firmware - a first test of CPU, GPU and presentation.
-    const fs::path bundled{"/app0/assets/misc/hbmenu.nro"};
-    if (fs::is_regular_file(bundled, ec)) {
-        Ps4::Log("no game of yours found; opening GD library with bundled Homebrew Menu");
-        Ps4::SetPadLight(255, 107, 0);
-        const std::vector<std::string> included{"Homebrew Menu (included).nro"};
-        // Failure to open the menu still falls back to the bundled test.
-        RunRomMenu(included, 0);
-        return bundled.string();
     }
     return {};
 }
@@ -491,7 +496,7 @@ void CheckMutexes() {
 int main() {
     Ps4::OpenBootLog();
     Ps4::Log("eden-ps4 starting (Eden %s %s)", Common::g_scm_branch, Common::g_scm_desc);
-    Ps4::Log("PS4 build: %s; GD test 33: safe default fastmem off; redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
+    Ps4::Log("PS4 build: %s; GD test 34: safe default fastmem off; redirect hotspot diagnostics (fixed table, no handler logging), test 29 heap guard, GPU arena 1152 MiB, fastmem view <= 64 GiB, direct memory map, unsafe CPU; defaults CPU ASTC, swizzle test off",
              EDEN_PS4_BUILD_ID);
     Ps4::InstallCrashReporting();
     Ps4::StartWatchdog();
