@@ -74,6 +74,25 @@ echo "creating fake-signed eboot..."
   --eboot "$ST/eboot.bin" --paid 0x3800000000000011 >/dev/null
 rm -f "$ST/eden-ps4.oelf"
 
+PROBE_NRO="$ROOT/switch-probe/gd-probe.nro"
+PROBE_EXTRA=()
+if [ -f "$PROBE_NRO" ]; then
+  # NRO0 magic appears at byte offset 0x10 of a Nintendo Switch NRO.
+  python3 - "$PROBE_NRO" <<'PY'
+import sys
+with open(sys.argv[1], "rb") as f:
+    f.seek(16)
+    magic = f.read(4)
+if magic != b"NRO0":
+    raise SystemExit(f"Invalid NRO (expected NRO0 at offset 0x10): {sys.argv[1]}")
+PY
+  PROBE_EXTRA=(--extra "$PROBE_NRO:assets/misc/gd-probe.nro")
+  echo "including built-in GD Probe: $PROBE_NRO"
+else
+  echo "warning: GD Probe not built; package will include only the hbmenu fallback"
+  echo "         run: make -C switch-probe  (requires devkitPro Switch SDK)"
+fi
+
 echo "building $CID.pkg..."
 bash "$PKG_SCRIPT" \
   --eboot "$ST/eboot.bin" \
@@ -88,7 +107,8 @@ bash "$PKG_SCRIPT" \
   --extra "$CACHE/sce_module/libc.prx:sce_module/libc.prx" \
   --extra "$CACHE/sce_module/libSceFios2.prx:sce_module/libSceFios2.prx" \
   --extra "$ROOT/testroms/hbmenu.nro:assets/misc/hbmenu.nro" \
-  --extra "$ROOT/testroms/hbmenu-LICENSE.txt:assets/misc/hbmenu-LICENSE.txt"
+  --extra "$ROOT/testroms/hbmenu-LICENSE.txt:assets/misc/hbmenu-LICENSE.txt" \
+  "${PROBE_EXTRA[@]}"
 
 PKG="$OUT/$CID.pkg"
 [ -f "$PKG" ] || die "package helper returned without producing $PKG"
