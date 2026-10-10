@@ -154,6 +154,31 @@ bool WriteFastmemSetting(bool on) {
     return true;
 }
 
+struct BootSummary {
+    std::string build = "Sem registro";
+    std::string status = "Sem medicao";
+    std::string fastmem = "Sem medicao";
+};
+BootSummary ReadBootSummary() {
+    BootSummary summary;
+    std::ifstream in{"/data/edenps4/boot.log"};
+    std::string line;
+    std::size_t count = 0;
+    // Only parse bounded text; never allow a large log to stall the menu.
+    while (count++ < 20000 && std::getline(in, line)) {
+        if (line.size() > 1024) continue;
+        const auto take = [&](const char* marker, std::string& dest) {
+            const auto pos = line.find(marker);
+            if (pos != std::string::npos) dest = line.substr(pos, 110);
+        };
+        take("PS4 build:", summary.build);
+        take("status: game ", summary.status);
+        take("fastmem: view ", summary.fastmem);
+        take("fastmem: off ", summary.fastmem);
+    }
+    return summary;
+}
+
 std::string DisplayName(const std::string& file) {
     std::string name = file;
     if (const auto dot = name.find_last_of('.'); dot != std::string::npos && dot > 0) {
@@ -163,7 +188,7 @@ std::string DisplayName(const std::string& file) {
 }
 
 // GD Edition palette: lightweight native graphics, no extra video allocations.
-void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool fastmemOn, bool settingsOpen, bool saveError) {
+void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool fastmemOn, bool settingsOpen, bool diagnosticsOpen, bool saveError, const BootSummary& summary) {
     constexpr uint32_t Base = 0xFF0B1120;
     constexpr uint32_t Panel = 0xFF182238;
     constexpr uint32_t Selected = 0xFF283B58;
@@ -186,8 +211,8 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     c.Print(Left + 100, 124, "GD EDITION  /  TEST 31", Muted, Base);
     c.Fill(Left, 183, Width - Left * 2, 2, 0xFF2B3750);
 
-    c.Print(Left, 216, settingsOpen ? "CONFIGURACOES" : "BIBLIOTECA", White, Base);
-    c.Print(Left, 253, settingsOpen ? "Ajustes experimentais do emulador" : "Selecione um aplicativo para iniciar", Muted, Base);
+    c.Print(Left, 216, settingsOpen ? "CONFIGURACOES" : diagnosticsOpen ? "DIAGNOSTICOS" : "BIBLIOTECA", White, Base);
+    c.Print(Left, 253, settingsOpen ? "Ajustes experimentais do emulador" : diagnosticsOpen ? "Dados registrados no ultimo boot" : "Selecione um aplicativo para iniciar", Muted, Base);
 
     // Single-column game list; reserve the right-hand pane for diagnostics.
     c.Fill(Left, ListTop - 12, ListWidth, 650, Panel);
@@ -201,6 +226,15 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
         c.Print(Left + 48, ListTop + 290, "Teste anterior no PS4 Fat: ON ~23 FPS", Muted, Panel);
         c.Print(Left + 48, ListTop + 340, "OFF ~60 FPS no Homebrew Menu.", Muted, Panel);
         if (saveError) c.Print(Left + 48, ListTop + 420, "ERRO: nao foi possivel salvar settings.txt", Accent, Panel);
+    } else if (diagnosticsOpen) {
+        c.Print(Left + 48, ListTop + 42, "ULTIMA BUILD REGISTRADA", Accent, Panel);
+        c.Print(Left + 48, ListTop + 90, summary.build, White, Panel, 63);
+        c.Print(Left + 48, ListTop + 176, "ULTIMO STATUS", Accent, Panel);
+        c.Print(Left + 48, ListTop + 224, summary.status, White, Panel, 63);
+        c.Print(Left + 48, ListTop + 310, "FASTMEM", Accent, Panel);
+        c.Print(Left + 48, ListTop + 358, summary.fastmem, White, Panel, 63);
+        c.Print(Left + 48, ListTop + 470, "Dados historicos, nao atualizados ao vivo.", Muted, Panel);
+        c.Print(Left + 48, ListTop + 526, "Circulo: voltar para biblioteca", Muted, Panel);
     } else {
         for (int row = 0; row < Rows && first + row < count; ++row) {
             const int index = first + row;
@@ -215,10 +249,10 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
                     surface, MaxChars);
         }
     }
-    if (!settingsOpen && first > 0) {
+    if (!settingsOpen && !diagnosticsOpen && first > 0) {
         c.Print(Left + ListWidth - 52, ListTop - 4, "^", Accent, Panel);
     }
-    if (!settingsOpen && first + Rows < count) {
+    if (!settingsOpen && !diagnosticsOpen && first + Rows < count) {
         c.Print(Left + ListWidth - 52, ListTop + Rows * RowHeight, "v", Accent, Panel);
     }
 
@@ -237,7 +271,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
     c.Print(SideX + 26, ListTop + 534, "Build experimental", Accent, Panel);
 
     c.Fill(Left, Height - 100, Width - Left * 2, 2, 0xFF2B3750);
-    c.Print(Left, Height - 72, settingsOpen ? "X  Alternar     O  Voltar" : "UP/DOWN  Navegar    X  Iniciar    []  Ajustes", Muted, Base);
+    c.Print(Left, Height - 72, settingsOpen ? "X  Alternar     O  Voltar" : diagnosticsOpen ? "O  Voltar" : "UP/DOWN  Navegar   X  Iniciar   []  Ajustes   TRI  Logs", Muted, Base);
     char position[32];
     std::snprintf(position, sizeof(position), "%d / %d", selected + 1, count);
     c.Print(Width - Left - int(std::strlen(position)) * MenuFont::Width,
@@ -288,6 +322,8 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
     int selected = std::clamp(initial, 0, int(names.size()) - 1);
     bool fastmemOn = ReadFastmemSetting();
     bool settingsOpen = false;
+    bool diagnosticsOpen = false;
+    BootSummary summary{};
     bool saveError = false;
     int back = 0;
     const auto present = [&] {
@@ -295,7 +331,7 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         Canvas canvas{static_cast<uint32_t*>(buffers[back])};
-        Draw(canvas, names, selected, fastmemOn, settingsOpen, saveError);
+        Draw(canvas, names, selected, fastmemOn, settingsOpen, diagnosticsOpen, saveError, summary);
         sceVideoOutSubmitFlip(handle, back, FlipVsync, 0);
         back ^= 1;
     };
@@ -313,7 +349,18 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
         }
         const std::uint32_t pressed = now & ~previous;
         previous = now;
-        if (pressed & Ps4::Button::Square) {
+        if ((pressed & Ps4::Button::Triangle) && !settingsOpen) {
+            diagnosticsOpen = !diagnosticsOpen;
+            if (diagnosticsOpen) summary = ReadBootSummary();
+            present();
+            continue;
+        }
+        if ((pressed & Ps4::Button::Circle) && diagnosticsOpen) {
+            diagnosticsOpen = false;
+            present();
+            continue;
+        }
+        if ((pressed & Ps4::Button::Square) && !diagnosticsOpen) {
             settingsOpen = !settingsOpen;
             saveError = false;
             present();
@@ -325,6 +372,7 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
             continue;
         }
         if (pressed & Ps4::Button::Cross) {
+            if (diagnosticsOpen) continue;
             if (!settingsOpen) break;
             const bool desired = !fastmemOn;
             saveError = !WriteFastmemSetting(desired);
@@ -332,7 +380,7 @@ int RunRomMenu(const std::vector<std::string>& names, int initial) {
             present();
             continue;
         }
-        if (settingsOpen) {
+        if (settingsOpen || diagnosticsOpen) {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             continue;
         }
