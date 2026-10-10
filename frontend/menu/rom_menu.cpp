@@ -223,7 +223,7 @@ void Frame(Canvas& c, MenuView view, bool fastmemOn) {
     c.Fill(L, 58, 76, 76, Orange);
     c.Print(L + 23, 86, "GD", White, Orange);
     c.Print(L + 108, 54, "NX ON ORBIS", White, Ink);
-    c.Print(L + 108, 94, "GD EDITION  /  TEST 35", Soft, Ink);
+    c.Print(L + 108, 94, "GD EDITION  /  TEST 36", Soft, Ink);
     c.Fill(Width - 470, 71, 374, 52, Surface);
     c.Fill(Width - 470, 71, 7, 52, fastmemOn ? Orange : Green);
     c.Print(Width - 442, 88, fastmemOn ? "FASTMEM EXPERIMENTAL" : "FASTMEM MODO SEGURO", White, Surface, 23);
@@ -332,7 +332,7 @@ void Draw(Canvas& c, const std::vector<std::string>& names, int selected, bool f
                          view == MenuView::Diagnostics ? "O VOLTAR     QUADRADO CONFIGURACOES" :
                          "X INICIAR     SETAS NAVEGAR     QUADRADO AJUSTES     TRI LOGS";
     c.Print(L + 4, 1003, footer, Soft, Ink, 74);
-    c.Print(1595, 1003, "GD 35  /  BETA", Orange, Ink, 17);
+    c.Print(1595, 1003, "GD 36  /  BETA", Orange, Ink, 17);
 }
 
 } // Anonymous namespace
