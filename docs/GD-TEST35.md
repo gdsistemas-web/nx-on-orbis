@@ -49,7 +49,7 @@ bash package-eden.sh
 ls -lh out-eden/*EDPS00035*.pkg
 ```
 
-O pacote só está pronto para distribuição após build e teste de hardware. **Esta branch ainda não foi compilada nem validada no console durante a edição remota.**
+O usuário compilou e empacotou localmente a GD35 em 2026-10-09, gerando `IV0000-EDPS00035_00-EDENPS4000000000.pkg` (~58 MB) e preservando o ELF correspondente. Capturas do PS4 Fat confirmam funcionamento inicial da interface e execução do GD Probe; ver registro de validação abaixo. Isso não equivale a uma certificação de estabilidade ou compatibilidade com jogos comerciais.
 
 ## Testes no console
 
@@ -58,3 +58,15 @@ O pacote só está pronto para distribuição após build e teste de hardware. *
 3. Abrir Quadrado e Triângulo; confirmar histórico de FPS da sessão anterior e fastmem OFF.
 4. Iniciar GD Probe; validar CPU, memória, botões e saída por Options. A tela fica congelada após o exit por design do frontend; fechar pelo botão PS.
 5. Ler boot.log e verificar `gd-test35`, mensagens de erro e o encerramento.
+
+## Registro de teste real no PS4 Fat — 2026-10-09
+
+Capturas de tela enviadas pelo testador mostram:
+
+- Home da GD Test 35 carregada com destaque do GD Probe, barra de fastmem em modo seguro e cards da biblioteca/diagnósticos.
+- Biblioteca com dois aplicativos visíveis: GD Probe e Homebrew Menu.
+- Configurações acessíveis, fastmem exibida como DESATIVADA / RECOMENDADA.
+- Diagnósticos exibindo dados da sessão anterior, com build `gd-test34-20261010T021841Z-0498b1e860c4`, FPS reportado 38.2, speed 100%, frame 26.1 ms, fastmem off (settings).
+- GD Probe 0.1 iniciou, exibiu checksum de CPU `ba34abe5f2510398`, `Memory 1 MiB: PASS`, contagem de apresentação e eventos de botões (last input UP).
+
+Os 38.2 FPS são históricos da execução da GD34, não uma medida da home GD35. Não comparar diretamente com ~60 FPS do hbmenu (cargas distintas). Ainda pendente: log de runtime da GD35, validação do encerramento específico desta versão e testes de jogos comerciais.
