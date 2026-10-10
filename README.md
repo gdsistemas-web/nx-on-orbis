@@ -2,7 +2,7 @@
 
 **English** | [Português (Brasil)](README.pt-BR.md)
 
-> **This is the `dev/fastmem-v1` continuation branch.** It is based on `experimental-fastmem` (tests 25-29) and adds **GD Test 30** fastmem hotspot diagnostics plus a reproducible Linux build/package path. The Test 30 PKG builds successfully on Linux; console validation is still pending. See [docs/GD-TEST30.md](docs/GD-TEST30.md).
+> **GD Edition — development temporarily on hold.** The main branch now consolidates changes through **GD Test 36**, tested on a **PS4 Fat running GoldHEN**: native dashboard, GD Probe 0.2, CPU/memory/input checks and animated color graphics. Graphics still show color-channel anomalies and experimental performance; **no commercial-game compatibility was validated during this continuation**. Resume from [docs/GD-TEST36.md](docs/GD-TEST36.md). This repository remains open.
 
 An experimental port of the **Eden** Nintendo Switch emulator (a yuzu fork) to a jailbroken
 **PS4 Pro** (OpenOrbis toolchain, Mesa RADV Vulkan driver for the PS4 GPU).
@@ -17,7 +17,7 @@ An experimental port of the **Eden** Nintendo Switch emulator (a yuzu fork) to a
 | Console | PS4 Pro, firmware 12.02, GoldHEN (the only console it was tested on) |
 | Base | Eden `5f142c79` (the commit the PS5 port ProsperoEden pins) + 31 patches in `patches/eden/` |
 | Toolchain | OpenOrbis 0.5.4 + [orbis-sdk-v1](https://github.com/orbis-ports/orbis-porting-kit/releases/tag/orbis-sdk-v1) (orbis-compat, Mesa RADV for "Liverpool" GFX7), LLVM 18, libc++ 18 built for the PS4 |
-| Stable release | [v0.1.0](../../releases/tag/v0.1.0): `.pkg` + the exact ELF (for symbolizing crash logs) |\n| Test 30 pre-release | [v0.2.0-test30](../../releases/tag/v0.2.0-test30): Linux build/package passed; PS4 validation pending |
+| Stable release | [v0.1.0](../../releases/tag/v0.1.0): `.pkg` + the exact ELF (for symbolizing crash logs) |\n| Latest test | **GD Test 36**: PKG built and GD Probe 0.2 exercised on PS4 Fat (source on `main`); graphics are still experimental. [Technical log](docs/GD-TEST36.md) |
 | License | GPL-3.0-or-later (see `LICENSE` and `NOTICE.md`) |
 
 ## Not affiliated with Eden. Built with AI.
