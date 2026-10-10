@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 source "$ROOT/tools/env-build.sh"
 
 TITLE="NX on Orbis - GD Test 32"
-TITLE_ID="EDPS00031"
+TITLE_ID="EDPS00032"
 CONTENT_LABEL="EDENPS4000000000"
 CID="IV0000-${TITLE_ID}_00-${CONTENT_LABEL}"
 ELF="${ELF:-$ROOT/build-eden/bin/eden-ps4}"
