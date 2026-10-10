@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-eden/bin/eden-ps4 (ELF) -> out-eden/IV0000-EDPS00035_00-EDENPS4000000000.pkg
+# build-eden/bin/eden-ps4 (ELF) -> out-eden/IV0000-EDPS00036_00-EDENPS4000000000.pkg
 #
 # Linux packaging path for the relocatable orbis-sdk-v1 bundle.
 # Preserves the package layout proven on the original PS4 Pro test console:
@@ -9,8 +9,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 source "$ROOT/tools/env-build.sh"
 
-TITLE="NX on Orbis - GD Test 35"
-TITLE_ID="EDPS00035"
+TITLE="NX on Orbis - GD Test 36"
+TITLE_ID="EDPS00036"
 CONTENT_LABEL="EDENPS4000000000"
 CID="IV0000-${TITLE_ID}_00-${CONTENT_LABEL}"
 ELF="${ELF:-$ROOT/build-eden/bin/eden-ps4}"
@@ -114,7 +114,7 @@ PKG="$OUT/$CID.pkg"
 [ -f "$PKG" ] || die "package helper returned without producing $PKG"
 
 STAMP="$(date +%Y%m%d-%H%M)"
-ELF_COPY="$ROOT/elf/eden-ps4-gd-test35-$STAMP.elf"
+ELF_COPY="$ROOT/elf/eden-ps4-gd-test36-$STAMP.elf"
 cp "$ELF" "$ELF_COPY"
 
 echo
